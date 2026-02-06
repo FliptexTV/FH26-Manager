@@ -35,7 +35,7 @@ const VotingModal: React.FC<VotingModalProps> = ({ player, onClose, onUpdate }) 
   const marketValue = (player.rating * 1.5).toFixed(1);
   
   // Total Votes
-  const totalVotes = Object.values(player.votes || {}).reduce((acc, curr) => acc + curr.score, 0);
+  const totalVotes = Object.values(player.votes || {}).reduce((acc: number, curr: any) => acc + (curr.score || 0), 0) as number;
 
   return (
     <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4 backdrop-blur-sm animate-in fade-in duration-200">

@@ -1,4 +1,5 @@
 {
   "name": "FC26 Ultimate Manager",
-  "description": "A modern football player card manager with 5v5 team builder and statistics."
+  "description": "A modern football player card manager with 5v5 team builder and statistics.",
+  "requestFramePermissions": []
 }

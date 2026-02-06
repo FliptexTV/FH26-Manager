@@ -1,5 +1,4 @@
 
-
 import { 
   collection, 
   doc, 
@@ -33,6 +32,37 @@ export const getCurrentUser = () => {
 
 export const getUserId = (): string => {
   return auth.currentUser ? auth.currentUser.uid : 'anon_user';
+};
+
+// --- USER DATA & ADMIN ---
+
+export interface UserData {
+    currency: number;
+    role?: 'admin' | 'user';
+}
+
+// Combined listener for Currency AND Role
+export const subscribeToUserData = (callback: (data: UserData) => void) => {
+    const user = auth.currentUser;
+    if (!user) {
+        callback({ currency: 0, role: 'user' });
+        return () => {};
+    }
+
+    const userDocRef = doc(db, USERS_COLLECTION, user.uid);
+    return onSnapshot(userDocRef, (docSnap) => {
+        if (docSnap.exists()) {
+            const data = docSnap.data();
+            callback({ 
+                currency: data.currency || 0,
+                role: data.role || 'user'
+            });
+        } else {
+            // Create user doc if it doesn't exist
+            setDoc(userDocRef, { currency: 0, role: 'user' }, { merge: true });
+            callback({ currency: 0, role: 'user' });
+        }
+    });
 };
 
 // --- DATABASE (GLOBAL CATALOG) ---
@@ -81,9 +111,6 @@ export const uploadPlayerImage = async (file: File): Promise<string> => {
 };
 
 // --- INVENTORY (MY CLUB) ---
-// In a real app, this should be a subcollection: users/{uid}/inventory
-// We will simulate this by storing an array of IDs in the user document to keep it simple,
-// OR fetch a subcollection. Let's use a subcollection for scalability.
 
 export const subscribeToInventory = (callback: (players: Player[]) => void) => {
     const user = auth.currentUser;
@@ -141,20 +168,8 @@ export const getPlayerById = async (id: string): Promise<Player | undefined> => 
 // --- CURRENCY ---
 
 export const subscribeToCurrency = (callback: (amount: number) => void) => {
-    const user = auth.currentUser;
-    if (!user) {
-        callback(0);
-        return () => {};
-    }
-
-    const userDocRef = doc(db, USERS_COLLECTION, user.uid);
-    return onSnapshot(userDocRef, (docSnap) => {
-        if (docSnap.exists()) {
-            callback(docSnap.data().currency || 0);
-        } else {
-            callback(0);
-        }
-    });
+    // Legacy support wrapper
+    return subscribeToUserData((data) => callback(data.currency));
 };
 
 export const addCurrency = async (amount: number) => {
@@ -198,17 +213,11 @@ export const getTeams = async (): Promise<Team[]> => {
     if (!user) return [];
     
     const q = query(collection(db, TEAMS_COLLECTION), orderBy('createdAt', 'desc'));
-    // Note: Ideally filter by user.uid if teams are private, 
-    // but for "Friend League" maybe all teams are public?
-    // Let's make teams user-specific for editing, but visible for matches
-    // For now: Fetch all teams created by current user
-    // To make it simple: We fetch ALL teams in the collection for now.
     
     const snapshot = await getDocs(q);
     const teams: Team[] = [];
     snapshot.forEach(doc => {
         const t = doc.data() as Team;
-        // Simple filter in JS (Firestore index needed for complex queries)
         if (!t.ownerId || t.ownerId === user.uid) {
             teams.push(t);
         }
@@ -241,15 +250,6 @@ export const getMatches = async (): Promise<MatchResult[]> => {
 export const saveMatch = async (match: MatchResult) => {
     await setDoc(doc(db, MATCHES_COLLECTION, match.id), match);
     await addCurrency(1); // Reward
-    
-    // In a full backend, we would use Cloud Functions to update stats safely.
-    // Here we do a "best effort" client update.
-    // NOTE: This can lead to race conditions if two people update the same player at once.
-    // For a friends app, it's acceptable.
-    
-    // Logic to update stats on players would go here, fetching and updating docs.
-    // Skipping complex stats updates for brevity in this refactor, 
-    // as it requires reading/writing many docs.
 };
 
 // --- VOTING ---

@@ -7,10 +7,12 @@ import {
     deleteFromDatabase, 
     checkDailyLoginBonus, 
     addCurrency,
-    getCurrentUser
+    subscribeToUserData
 } from './services/playerService';
 import { auth, googleProvider } from './services/firebase';
 import { signInWithPopup, signOut, onAuthStateChanged, User } from 'firebase/auth';
+// Fix: Import * as firebaseAuth to resolve missing member errors
+import * as firebaseAuth from 'firebase/auth';
 
 import PlayerCard from './components/PlayerCard';
 import PlayerForm from './components/PlayerForm';
@@ -20,11 +22,12 @@ import MatchView from './components/MatchView';
 import PackOpener from './components/PackOpener';
 import VotingModal from './components/VotingModal';
 import ConfirmationModal from './components/ConfirmationModal';
-import { LayoutGrid, Users, BarChart3, Plus, ShieldCheck, Shield, PlayCircle, ArrowUpDown, Package, Gift, CheckCircle2, LogIn, LogOut, Globe } from 'lucide-react';
+import { LayoutGrid, Users, BarChart3, Plus, ShieldCheck, PlayCircle, ArrowUpDown, Package, Gift, CheckCircle2, LogIn, LogOut, Globe } from 'lucide-react';
 
 const App: React.FC = () => {
   // Auth State
-  const [user, setUser] = useState<User | null>(null);
+  // Fix: Use firebaseAuth.User type
+  const [user, setUser] = useState<firebaseAuth.User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
 
   const [view, setView] = useState<ViewState>('players');
@@ -34,14 +37,18 @@ const App: React.FC = () => {
   const [editingPlayer, setEditingPlayer] = useState<Player | undefined>(undefined);
   const [votingPlayer, setVotingPlayer] = useState<Player | undefined>(undefined);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  
+  // Admin State (from DB)
   const [isAdmin, setIsAdmin] = useState(false);
+  
   const [playerToDelete, setPlayerToDelete] = useState<string | null>(null);
   const [toast, setToast] = useState<{message: string, type: 'success' | 'info'} | null>(null);
   const [sortConfig, setSortConfig] = useState<{ key: 'rating' | 'name', direction: 'asc' | 'desc' }>({ key: 'rating', direction: 'desc' });
 
   // 1. Auth Listener
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    // Fix: Use firebaseAuth.onAuthStateChanged
+    const unsubscribe = firebaseAuth.onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       setAuthLoading(false);
     });
@@ -52,8 +59,15 @@ const App: React.FC = () => {
   useEffect(() => {
     if (user) {
         setLoadingPlayers(true);
+        
+        // Listen to User Data (Role & Currency)
+        const unsubUser = subscribeToUserData((data) => {
+            // Check database role directly
+            setIsAdmin(data.role === 'admin');
+        });
+
         // Real-time subscription to the Global Player Catalog
-        const unsubscribe = subscribeToPlayers((data) => {
+        const unsubPlayers = subscribeToPlayers((data) => {
             setPlayers(data);
             setLoadingPlayers(false);
         });
@@ -63,31 +77,36 @@ const App: React.FC = () => {
             if (hasBonus) setToast({ message: "Täglicher Bonus: +5 Punkte!", type: 'success' });
         });
 
-        return () => unsubscribe();
+        return () => {
+            unsubUser();
+            unsubPlayers();
+        };
     } else {
         setPlayers([]);
+        setIsAdmin(false);
     }
   }, [user]);
 
   // Auth Functions
   const handleLogin = async () => {
     try {
-        await signInWithPopup(auth, googleProvider);
+        // Fix: Use firebaseAuth.signInWithPopup
+        await firebaseAuth.signInWithPopup(auth, googleProvider);
     } catch (error) {
         console.error("Login failed", error);
         alert("Login fehlgeschlagen. Prüfe deine Firebase Config.");
     }
   };
 
-  const handleLogout = () => signOut(auth);
+  // Fix: Use firebaseAuth.signOut
+  const handleLogout = () => firebaseAuth.signOut(auth);
 
   // CRUD & Interaction
   const handleSavePlayer = async (player: Player) => {
-    setLoadingPlayers(true); // Optimistic loading
+    setLoadingPlayers(true); 
     await saveToDatabase(player);
     setIsFormOpen(false);
     setEditingPlayer(undefined);
-    // Note: No need to setPlayers, the subscription will update it automatically!
   };
 
   const handleRequestDelete = (id: string) => setPlayerToDelete(id);
@@ -100,9 +119,6 @@ const App: React.FC = () => {
   };
 
   const handlePlayerUpdate = (updatedPlayer: Player) => {
-     // The voting modal updates the DB directly. 
-     // The real-time listener will update the 'players' list.
-     // We just need to update the modal view if it's open.
      setVotingPlayer(updatedPlayer);
   };
 
@@ -160,9 +176,6 @@ const App: React.FC = () => {
                       <LogIn size={20} />
                       Mit Google anmelden
                   </button>
-                  <p className="mt-4 text-xs text-slate-600">
-                      Hinweis: Dies ist eine Demo-App. Bitte konfiguriere Firebase in <code>services/firebase.ts</code>.
-                  </p>
               </div>
           </div>
       );
@@ -199,13 +212,11 @@ const App: React.FC = () => {
                 <span className="hidden md:inline text-sm font-bold">{user.displayName}</span>
             </div>
             
-            <button 
-            onClick={() => setIsAdmin(!isAdmin)}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${isAdmin ? 'bg-green-500/10 border-green-500 text-green-400' : 'bg-slate-800 border-slate-700 text-slate-400'}`}
-            >
-            {isAdmin ? <ShieldCheck size={14}/> : <Shield size={14}/>}
-            {isAdmin ? 'ADMIN' : 'USER'}
-            </button>
+            {isAdmin && (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold border bg-green-500/10 border-green-500 text-green-400 cursor-default animate-in fade-in" title="Du bist Admin">
+                    <ShieldCheck size={14}/> ADMIN
+                </div>
+            )}
             
             <button onClick={handleLogout} className="p-2 text-slate-500 hover:text-red-400" title="Logout">
                 <LogOut size={20} />
@@ -228,7 +239,7 @@ const App: React.FC = () => {
               </div>
               
               <div className="flex items-center gap-3 w-full md:w-auto">
-                 {/* Sorting & Admin Create Buttons (Same as before) */}
+                 {/* Sorting */}
                  <div className="flex items-center bg-slate-800 rounded-lg p-1 border border-slate-700">
                     <span className="px-2 text-slate-500"><ArrowUpDown size={14}/></span>
                     <select 
