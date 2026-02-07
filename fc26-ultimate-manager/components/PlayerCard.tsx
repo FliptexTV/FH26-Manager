@@ -63,7 +63,7 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
   const isSmall = size === 'sm';
   
   // Adjusted vertical positions
-  const textContainerPosition = isSmall ? 'bottom-[16%]' : 'bottom-[10%]';
+  const textContainerPosition = isSmall ? 'bottom-[16%]' : 'bottom-[8%]';
   const ratingPosition = isSmall ? 'top-[18%]' : 'top-[20%]';
 
   // --- TILT LOGIC ---
@@ -143,7 +143,7 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
         </div>
 
         {/* Player Image */}
-        <div className="absolute bottom-[28%] left-1/2 -translate-x-1/2 w-[70%] h-[50%] z-0 flex items-end justify-center">
+        <div className="absolute bottom-[31%] left-1/2 -translate-x-1/2 w-[70%] h-[50%] z-0 flex items-end justify-center">
             <img 
             src={player.image} 
             alt={player.name} 
@@ -157,7 +157,7 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
         {/* Name and Stats Area */}
         <div className={`absolute ${textContainerPosition} left-0 right-0 mx-auto flex flex-col items-center w-full z-10 px-2`}>
             {/* Name */}
-            <h3 className={`font-bold uppercase tracking-wide text-center truncate w-full leading-none ${size === 'lg' ? 'text-2xl mb-2' : size === 'md' ? 'text-lg mb-1' : 'text-[0.6rem] mb-[1px]'}`}>
+            <h3 className={`font-bold tracking-wide text-center truncate w-full leading-none ${size === 'lg' ? 'text-2xl mb-2' : size === 'md' ? 'text-lg mb-1' : 'text-[0.6rem] mb-[1px]'}`}>
                 {player.name}
             </h3>
             
