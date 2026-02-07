@@ -34,9 +34,9 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
   
   // Scaling classes
   const sizeClasses = {
-    sm: "w-24 h-[148px] text-[0.5rem]",
-    md: "w-48 h-[296px] text-xs",
-    lg: "w-64 h-[395px] text-sm"
+    sm: "w-32 h-[148px] text-[0.5rem]", 
+    md: "w-60 h-[296px] text-xs",      
+    lg: "w-80 h-[395px] text-sm"       
   };
   
   // Helper for stat names map
@@ -52,7 +52,7 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
   // Dynamic Styles
   const cardStyle: React.CSSProperties = {
     backgroundImage: `url(${design.url})`,
-    backgroundSize: 'cover', 
+    backgroundSize: '100% 100%',
     backgroundPosition: 'center',
     backgroundRepeat: 'no-repeat',
     color: design.textColor,
@@ -61,7 +61,10 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
   
   const shapeClass = "rounded-t-2xl rounded-b-[2.5rem]";
   const isSmall = size === 'sm';
-  const textContainerPosition = isSmall ? 'bottom-[16%]' : 'bottom-[9%]';
+  
+  // Adjusted vertical positions
+  const textContainerPosition = isSmall ? 'bottom-[16%]' : 'bottom-[10%]';
+  const ratingPosition = isSmall ? 'top-[18%]' : 'top-[20%]';
 
   // --- TILT LOGIC ---
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -132,20 +135,19 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
       {/* Content Wrapper */}
       <div className="absolute inset-0 flex flex-col p-2 z-10" style={{ color: design.textColor }}>
         
-        {/* Top Info (Rating & Position) */}
-        <div className="absolute top-[22%] left-1 flex justify-between items-start px-1 mt-2">
-            <div className="flex flex-col items-center leading-none">
-                <span className={`font-bold ${size === 'lg' ? 'text-5xl' : size === 'md' ? 'text-3xl' : 'text-xl'}`}>{player.rating}</span>
-                <span className={`font-medium uppercase tracking-tighter ${size === 'lg' ? 'text-xl' : size === 'md' ? 'text-sm' : 'text-[0.6rem]'}`}>{player.position}</span>
-            </div>
+        {/* Top Info (Rating & Position) - SHIFTED LEFT */}
+        <div className={`absolute ${ratingPosition} left-[8%] w-[20%] flex flex-col items-center leading-none text-center`}>
+            <span className={`font-bold block ${size === 'lg' ? 'text-5xl' : size === 'md' ? 'text-3xl' : 'text-xl'}`}>{player.rating}</span>
+            <span className={`font-medium uppercase block ${size === 'lg' ? 'text-xl mt-1' : size === 'md' ? 'text-sm' : 'text-[0.6rem]'}`}>{player.position}</span>
+            {/* Nation removed from here */}
         </div>
 
         {/* Player Image */}
-        <div className="absolute bottom-[26%] left-1/2 -translate-x-1/2 w-[85%] h-[55%] z-0">
+        <div className="absolute bottom-[28%] left-1/2 -translate-x-1/2 w-[70%] h-[50%] z-0 flex items-end justify-center">
             <img 
             src={player.image} 
             alt={player.name} 
-            className="w-full h-full object-contain drop-shadow-[0_5px_5px_rgba(0,0,0,0.4)]"
+            className="w-full h-full object-contain drop-shadow-[0_4px_4px_rgba(0,0,0,0.5)]"
             onError={(e) => {
                 (e.target as HTMLImageElement).src = 'https://via.placeholder.com/150?text=Player';
             }}
@@ -153,24 +155,20 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
         </div>
 
         {/* Name and Stats Area */}
-        <div className={`absolute ${textContainerPosition} right-0.5 mt-auto flex flex-col items-center w-full z-10`}>
+        <div className={`absolute ${textContainerPosition} left-0 right-0 mx-auto flex flex-col items-center w-full z-10 px-2`}>
             {/* Name */}
-            <h3 className={`font-bold tracking-wide text-center truncate w-full mb-[1px] ${size === 'lg' ? 'text-2xl' : size === 'md' ? 'text-lg' : 'text-[0.6rem]'}`}>
+            <h3 className={`font-bold uppercase tracking-wide text-center truncate w-full leading-none ${size === 'lg' ? 'text-2xl mb-2' : size === 'md' ? 'text-lg mb-1' : 'text-[0.6rem] mb-[1px]'}`}>
                 {player.name}
             </h3>
             
-            {/* Divider REMOVED as requested */}
-
-            {/* Single Row Stats */}
+            {/* Stats */}
             {!isSmall && (
-                <div className="flex justify-between w-full px-1">
+                <div className="flex justify-center items-end w-[85%]">
                     {statKeys.map((key) => {
-                        // Check for votes
                         const voteScore = player.votes?.[key]?.score || 0;
                         const isUp = voteScore > 0;
                         const isDown = voteScore < 0;
                         
-                        // Define color override if significant vote exists
                         const statColorClass = isUp 
                             ? 'text-green-600 drop-shadow-sm font-black' 
                             : isDown 
@@ -178,15 +176,19 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
                                 : '';
 
                         return (
-                            <div key={key} className="flex flex-col items-center w-1/6 relative group/stat">
-                                <span className={`font-bold leading-none flex items-center ${size === 'lg' ? 'text-lg' : 'text-sm'} ${statColorClass}`}>
-                                    {player.stats[key as keyof typeof player.stats]}
-                                    {isUp && <span className="absolute -top-1 -right-1 text-[8px] text-green-600">▲</span>}
-                                    {isDown && <span className="absolute -top-1 -right-1 text-[8px] text-red-600">▼</span>}
-                                </span>
-                                <span className="text-[0.55rem] uppercase font-semibold opacity-80 mt-[1px]">
+                            <div key={key} className="flex flex-col items-center flex-1 relative group/stat leading-none">
+                                {/* Label First */}
+                                <span className={`${size === 'lg' ? 'text-xs' : 'text-[0.7rem]'} uppercase font-bold opacity-80`}>
                                     {statLabels[key]}
                                 </span>
+                                {/* Value Second */}
+                                <span className={`font-normal flex items-center ${size === 'lg' ? 'text-3xl' : 'text-xl'} ${statColorClass} -mt-1`}>
+                                    {player.stats[key as keyof typeof player.stats]}
+                                </span>
+                                
+                                {/* Vote Indicators */}
+                                {isUp && <span className="absolute -top-1 -right-0 text-[8px] text-green-600">▲</span>}
+                                {isDown && <span className="absolute -top-1 -right-0 text-[8px] text-red-600">▼</span>}
                             </div>
                         );
                     })}
@@ -194,24 +196,17 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
             )}
             
             {/* Small view backup */}
-            {isSmall && <div className="text-[0.4rem] opacity-70 mb-[2px]">FC26</div>}
+            {isSmall && <div className="text-[0.4rem] opacity-70 mb-[2px] leading-none">FC26</div>}
 
-            {/* Bottom Footer: Nation & Club - Border removed as requested */}
+            {/* Bottom Footer: Nation & Club - ADDED HERE */}
             {!isSmall && (
-                <div className="mt-1 pt-1 w-[90%] flex items-center justify-center gap-2 opacity-80 pb-1">
-                    {/* Render Flag directly if present */}
-                    {player.nation ? (
-                         <span className="text-[14px] leading-none font-sans" role="img" aria-label="nation">{player.nation}</span>
-                    ) : (
-                         <Flag size={10} />
-                    )}
-                    
-                    {player.club && (
-                        <>
-                         <span className="text-[8px]">•</span>
-                         <span className="text-[8px] font-semibold truncate max-w-[60px] uppercase">{player.club}</span>
-                        </>
-                    )}
+                <div className="mt-1 w-full flex flex-col items-center justify-center gap-0.5">
+                     {player.nation && (
+                        <span className={`${size === 'lg' ? 'text-xl' : 'text-lg'} drop-shadow-sm leading-none`} role="img" aria-label="nation">{player.nation}</span>
+                     )}
+                     {player.club && (
+                        <span className="text-[10px] font-semibold truncate max-w-[80%] uppercase tracking-wider opacity-80">{player.club}</span>
+                     )}
                 </div>
             )}
         </div>
