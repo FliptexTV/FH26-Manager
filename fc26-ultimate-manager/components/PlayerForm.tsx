@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Player, Position, PlayerStats, CardType, GameStats } from '../types';
 import { POSITION_WEIGHTS, CARD_DESIGNS, NATIONS } from '../constants';
 import { uploadPlayerImage } from '../services/playerService';
-import { Upload, X, Calculator, Check, Link as LinkIcon, Loader2, Trophy, BarChart3 } from 'lucide-react';
+import { Upload, X, Calculator, Check, Link as LinkIcon, Loader2, Trophy, BarChart3, TrendingUp } from 'lucide-react';
 
 interface PlayerFormProps {
   initialPlayer?: Player;
@@ -29,19 +29,39 @@ const PlayerForm: React.FC<PlayerFormProps> = ({ initialPlayer, onSave, onCancel
   const [autoCalculate, setAutoCalculate] = useState(true);
   const isGK = formData.position === Position.GK;
 
+  // New "Real FC" Formula
   const calculateOVR = (position: Position, stats: PlayerStats) => {
     const weights = POSITION_WEIGHTS[position];
     if (!weights) return 75;
+
     let totalScore = 0;
     let totalWeight = 0;
+
     (Object.keys(weights) as Array<keyof PlayerStats>).forEach(key => {
         const statValue = stats[key] || 0;
         const weight = weights[key] || 0;
         totalScore += statValue * weight;
         totalWeight += weight;
     });
+
     if (totalWeight === 0) return 0;
-    return Math.round(totalScore / totalWeight);
+
+    // 1. Base Rating (Weighted Average)
+    let baseRating = Math.round(totalScore / totalWeight);
+
+    // 2. International Reputation Simulation (The "FC Boost")
+    // FC ratings add a boost based on the base rating to simulate star power.
+    // e.g. Base 85 -> +2 Boost -> 87 OVR.
+    let intlRepBoost = 0;
+    if (baseRating >= 90) intlRepBoost = 3;
+    else if (baseRating >= 80) intlRepBoost = 2;
+    else if (baseRating >= 70) intlRepBoost = 1;
+    else if (baseRating >= 50) intlRepBoost = 0; // No boost for silver/bronze usually
+    
+    // 3. Final Clamping
+    const finalRating = Math.min(99, baseRating + intlRepBoost);
+    
+    return finalRating;
   };
 
   useEffect(() => {
@@ -198,11 +218,14 @@ const PlayerForm: React.FC<PlayerFormProps> = ({ initialPlayer, onSave, onCancel
                 )}
                 </div>
                 
-                <div className="mt-6">
+                <div className="mt-6 flex items-center justify-between">
                     <label className="flex items-center gap-2 cursor-pointer">
                         <input type="checkbox" checked={autoCalculate} onChange={(e) => setAutoCalculate(e.target.checked)} className="rounded bg-slate-700 border-slate-600 text-green-500 focus:ring-green-500" />
-                        <span className="text-xs text-slate-400">Rating automatisch berechnen</span>
+                        <span className="text-xs text-slate-400">Rating automatisch (FC Style)</span>
                     </label>
+                    {autoCalculate && (
+                         <span className="text-[10px] text-green-400 bg-green-900/20 px-2 py-0.5 rounded flex items-center gap-1 border border-green-900/50"><TrendingUp size={10}/> Intl. Rep Boost active</span>
+                    )}
                 </div>
             </div>
 
