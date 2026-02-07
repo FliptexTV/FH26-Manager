@@ -372,7 +372,7 @@ const App: React.FC = () => {
 
         {/* View Routing */}
         {view === 'team' && <TeamBuilder allPlayers={players} />}
-        {view === 'matches' && <MatchView />}
+        {view === 'matches' && <MatchView isAdmin={isAdmin} />}
         {view === 'packs' && <PackOpener />}
         {view === 'stats' && <StatsView players={players} />}
 

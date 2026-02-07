@@ -1,14 +1,21 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Player, Team, MatchResult, MatchEvent } from '../types';
-import { getTeams, saveMatch, getMatches, getPlayerById } from '../services/playerService';
-import { Play, Pause, Save, Trophy, Timer, Club, History, Calendar, LayoutList, Minus, Trash2 } from 'lucide-react';
+import { getTeams, saveMatch, getMatches, getPlayerById, deleteMatch } from '../services/playerService';
+import { Play, Pause, Save, Trophy, Timer, Club, History, Calendar, LayoutList, Minus, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 
-const MatchView: React.FC = () => {
+interface MatchViewProps {
+    isAdmin?: boolean;
+}
+
+const MatchView: React.FC<MatchViewProps> = ({ isAdmin }) => {
   const [activeTab, setActiveTab] = useState<'new' | 'history'>('new');
   const [teams, setTeams] = useState<Team[]>([]);
   const [matchHistory, setMatchHistory] = useState<MatchResult[]>([]);
   
+  // History Expansion State
+  const [expandedMatchId, setExpandedMatchId] = useState<string | null>(null);
+
   const [homeTeamId, setHomeTeamId] = useState<string>('');
   const [awayTeamId, setAwayTeamId] = useState<string>('');
   const [isMatchActive, setIsMatchActive] = useState(false);
@@ -118,6 +125,19 @@ const MatchView: React.FC = () => {
     setMatchFinished(false);
     setTime(0); setHomeScore(0); setAwayScore(0); setEvents([]);
     setActiveTab('history');
+  };
+
+  const toggleHistoryExpand = (matchId: string) => {
+      if (expandedMatchId === matchId) setExpandedMatchId(null);
+      else setExpandedMatchId(matchId);
+  };
+
+  const handleDeleteMatch = async (id: string, e: React.MouseEvent) => {
+      e.stopPropagation();
+      if(window.confirm("Match unwiderruflich löschen?")) {
+          await deleteMatch(id);
+          setMatchHistory(prev => prev.filter(m => m.id !== id));
+      }
   };
 
   if (isMatchActive || matchFinished) {
@@ -230,10 +250,56 @@ const MatchView: React.FC = () => {
           ) : (
               <div className="space-y-4">
                   {matchHistory.map(m => (
-                      <div key={m.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex justify-between items-center">
-                          <span className="font-bold truncate w-1/3">{teams.find(t=>t.id===m.homeTeamId)?.name}</span>
-                          <span className="bg-black/40 px-3 py-1 rounded font-mono font-bold text-xl">{m.homeScore} : {m.awayScore}</span>
-                          <span className="font-bold truncate w-1/3 text-right">{teams.find(t=>t.id===m.awayTeamId)?.name}</span>
+                      <div key={m.id} className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+                          {/* Match Header Row */}
+                          <div 
+                              onClick={() => toggleHistoryExpand(m.id)}
+                              className="p-4 flex justify-between items-center cursor-pointer hover:bg-slate-800 transition"
+                          >
+                            <span className="font-bold truncate w-1/3 text-sm md:text-base">{teams.find(t=>t.id===m.homeTeamId)?.name}</span>
+                            <div className="flex items-center gap-2">
+                                <span className="bg-black/40 px-3 py-1 rounded font-mono font-bold text-lg md:text-xl">{m.homeScore} : {m.awayScore}</span>
+                                <span className="text-slate-500">{expandedMatchId === m.id ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}</span>
+                            </div>
+                            <span className="font-bold truncate w-1/3 text-right text-sm md:text-base">{teams.find(t=>t.id===m.awayTeamId)?.name}</span>
+                          </div>
+
+                          {/* Expanded Details */}
+                          {expandedMatchId === m.id && (
+                              <div className="bg-slate-950/50 p-4 border-t border-slate-800 animate-in slide-in-from-top-2">
+                                  {m.events && m.events.length > 0 ? (
+                                      <div className="space-y-2 mb-4">
+                                          <div className="text-xs text-slate-500 font-bold uppercase mb-2">Spielereignisse</div>
+                                          {m.events.sort((a,b) => a.minute - b.minute).map((ev, i) => (
+                                              <div key={i} className="flex items-center gap-3 text-sm border-b border-slate-800/50 pb-1 last:border-0">
+                                                  <span className="font-mono text-slate-500 w-8">{ev.minute}'</span>
+                                                  <div className="flex items-center gap-2">
+                                                      <Club size={12} className={ev.teamId === m.homeTeamId ? 'text-green-400' : 'text-red-400'} />
+                                                      <span className={ev.teamId === m.homeTeamId ? 'text-green-100' : 'text-red-100'}>
+                                                          {playerCache[ev.playerId]?.name || 'Unbekannt'}
+                                                      </span>
+                                                  </div>
+                                              </div>
+                                          ))}
+                                      </div>
+                                  ) : (
+                                      <div className="text-slate-500 text-sm italic p-2 text-center">Keine Ereignisse aufgezeichnet.</div>
+                                  )}
+                                  
+                                  {/* Footer with Delete for Admin */}
+                                  <div className="flex justify-between items-center mt-2 pt-2 border-t border-slate-800">
+                                      <span className="text-[10px] text-slate-600">ID: {m.id}</span>
+                                      {isAdmin && (
+                                          <button 
+                                              onClick={(e) => handleDeleteMatch(m.id, e)} 
+                                              className="flex items-center gap-1 text-red-400 hover:text-red-300 text-xs font-bold uppercase p-2 rounded hover:bg-red-900/20 transition"
+                                          >
+                                              <Trash2 size={14} /> Löschen
+                                          </button>
+                                      )}
+                                  </div>
+                              </div>
+                          )}
                       </div>
                   ))}
                   {matchHistory.length === 0 && <div className="text-center text-slate-500">Keine Spiele.</div>}

@@ -289,6 +289,10 @@ export const saveMatch = async (match: MatchResult) => {
     await addCurrency(1); // Reward
 };
 
+export const deleteMatch = async (id: string) => {
+    await deleteDoc(doc(db, MATCHES_COLLECTION, id));
+};
+
 // --- VOTING ---
 
 export const voteForStat = async (playerId: string, statKey: string, direction: 'up' | 'down') => {
