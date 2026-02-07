@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Player, Team, MatchResult, MatchEvent } from '../types';
 import { getTeams, saveMatch, getMatches, getPlayerById } from '../services/playerService';
-import { Play, Pause, Save, Trophy, Timer, Club, History, Calendar, LayoutList } from 'lucide-react';
+import { Play, Pause, Save, Trophy, Timer, Club, History, Calendar, LayoutList, Minus, Trash2 } from 'lucide-react';
 
 const MatchView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'new' | 'history'>('new');
@@ -33,7 +33,7 @@ const MatchView: React.FC = () => {
     loadData();
   }, []);
 
-  // Timer Logic (Same as before)
+  // Timer Logic
   useEffect(() => {
     if (isRunning) {
       timerRef.current = window.setInterval(() => setTime(t => t + 1), 1000); 
@@ -54,7 +54,6 @@ const MatchView: React.FC = () => {
 
   // Resolve players when events change or history loads
   useEffect(() => {
-      // Pre-fetch players involved in history
       matchHistory.forEach(m => m.events.forEach(e => resolvePlayer(e.playerId)));
   }, [matchHistory]);
 
@@ -64,7 +63,6 @@ const MatchView: React.FC = () => {
     if (homeTeamId && awayTeamId && homeTeamId !== awayTeamId) {
       setIsMatchActive(true);
       setIsRunning(true);
-      // Pre-fetch team players
       const home = teams.find(t => t.id === homeTeamId);
       const away = teams.find(t => t.id === awayTeamId);
       home?.playerIds.forEach(id => id && resolvePlayer(id));
@@ -72,13 +70,39 @@ const MatchView: React.FC = () => {
     }
   };
 
-  const handleGoal = (teamId: string) => { if (isRunning) setScoringTeam(teamId); };
+  const handleGoal = (teamId: string) => { if (isRunning || matchFinished) setScoringTeam(teamId); };
 
   const confirmGoal = (playerId: string) => {
     if (!scoringTeam) return;
     if (scoringTeam === homeTeamId) setHomeScore(h => h + 1); else setAwayScore(a => a + 1);
     setEvents(prev => [...prev, { type: 'goal', playerId, minute: Math.floor(time / 60), teamId: scoringTeam }]);
     setScoringTeam(null);
+  };
+
+  // Logic to undo the last goal for a team
+  const undoGoal = (teamId: string) => {
+      // 1. Decrease Score
+      if (teamId === homeTeamId && homeScore > 0) setHomeScore(h => h - 1);
+      if (teamId === awayTeamId && awayScore > 0) setAwayScore(a => a - 1);
+
+      // 2. Remove latest event for this team
+      const newEvents = [...events];
+      const lastEventIndex = newEvents.reverse().findIndex(e => e.teamId === teamId && e.type === 'goal');
+      
+      if (lastEventIndex !== -1) {
+          // Because we reversed, the index needs to be flipped back
+          const trueIndex = newEvents.length - 1 - lastEventIndex;
+          setEvents(prev => prev.filter((_, i) => i !== trueIndex));
+      }
+  };
+
+  const deleteEvent = (index: number) => {
+      const eventToDelete = events[index];
+      if (eventToDelete.type === 'goal') {
+           if (eventToDelete.teamId === homeTeamId) setHomeScore(h => Math.max(0, h - 1));
+           else setAwayScore(a => Math.max(0, a - 1));
+      }
+      setEvents(prev => prev.filter((_, i) => i !== index));
   };
 
   const finishMatch = () => { setIsRunning(false); setMatchFinished(true); };
@@ -105,52 +129,76 @@ const MatchView: React.FC = () => {
             {/* Scoreboard */}
             <div className="bg-slate-900 border-4 border-slate-800 rounded-2xl p-6 text-center relative">
                  <div className="text-2xl font-mono text-yellow-400 mb-4">{formatTime(time)}</div>
-                 <div className="flex justify-between items-center text-4xl md:text-6xl font-black text-white">
-                     <div onClick={() => handleGoal(homeTeamId)} className="cursor-pointer hover:text-green-400">{homeScore}</div>
-                     <div className="text-slate-600">:</div>
-                     <div onClick={() => handleGoal(awayTeamId)} className="cursor-pointer hover:text-red-400">{awayScore}</div>
+                 
+                 <div className="flex justify-between items-center text-white">
+                     {/* Home Score & Controls */}
+                     <div className="flex flex-col items-center gap-2">
+                         <div onClick={() => handleGoal(homeTeamId)} className="text-4xl md:text-6xl font-black cursor-pointer hover:text-green-400 transition select-none">{homeScore}</div>
+                         <button onClick={() => undoGoal(homeTeamId)} className="text-slate-500 hover:text-red-400 p-1 border border-slate-700 rounded-full" title="Tor löschen"><Minus size={16}/></button>
+                     </div>
+                     
+                     <div className="text-slate-600 text-4xl font-black">:</div>
+                     
+                     {/* Away Score & Controls */}
+                     <div className="flex flex-col items-center gap-2">
+                         <div onClick={() => handleGoal(awayTeamId)} className="text-4xl md:text-6xl font-black cursor-pointer hover:text-red-400 transition select-none">{awayScore}</div>
+                         <button onClick={() => undoGoal(awayTeamId)} className="text-slate-500 hover:text-red-400 p-1 border border-slate-700 rounded-full" title="Tor löschen"><Minus size={16}/></button>
+                     </div>
                  </div>
-                 <div className="flex justify-between text-sm mt-2 text-slate-400 font-bold">
-                     <span>{homeTeam?.name}</span><span>{awayTeam?.name}</span>
+
+                 <div className="flex justify-between text-sm mt-4 text-slate-400 font-bold px-4">
+                     <span className="truncate max-w-[100px]">{homeTeam?.name}</span>
+                     <span className="truncate max-w-[100px] text-right">{awayTeam?.name}</span>
                  </div>
+
                  <div className="mt-8 flex justify-center gap-4">
                      {!matchFinished ? (
-                         <><button onClick={() => setIsRunning(!isRunning)} className="bg-slate-800 p-3 rounded-full text-white">{isRunning ? <Pause/> : <Play/>}</button> 
-                           <button onClick={finishMatch} className="bg-red-600 px-6 py-2 rounded-lg text-white font-bold">Ende</button></>
+                         <><button onClick={() => setIsRunning(!isRunning)} className="bg-slate-800 p-3 rounded-full text-white border border-slate-700 hover:bg-slate-700">{isRunning ? <Pause/> : <Play/>}</button> 
+                           <button onClick={finishMatch} className="bg-red-600 px-6 py-2 rounded-lg text-white font-bold hover:bg-red-500">Ende</button></>
                      ) : (
-                         <button onClick={saveMatchResult} className="bg-green-600 px-8 py-3 rounded-lg text-white font-bold flex gap-2"><Save/> Speichern</button>
+                         <div className="flex gap-2">
+                             <button onClick={() => setMatchFinished(false)} className="bg-slate-700 px-4 py-3 rounded-lg text-white font-bold hover:bg-slate-600">Zurück</button>
+                             <button onClick={saveMatchResult} className="bg-green-600 px-8 py-3 rounded-lg text-white font-bold flex gap-2 hover:bg-green-500"><Save/> Speichern</button>
+                         </div>
                      )}
                  </div>
             </div>
 
             {/* Events */}
             <div className="mt-4 space-y-2">
-                {[...events].reverse().map((ev, i) => (
-                    <div key={i} className="bg-slate-900 p-2 rounded flex gap-2 items-center border border-slate-800">
-                        <span className="font-mono text-slate-500">{ev.minute}'</span>
-                        <Club size={12} className={ev.teamId === homeTeamId ? 'text-green-400' : 'text-red-400'}/>
-                        <span>{playerCache[ev.playerId]?.name || 'Loading...'}</span>
+                <h3 className="text-xs font-bold text-slate-500 uppercase ml-2">Match Events (Klicken zum Löschen)</h3>
+                {[...events].map((ev, i) => (
+                    <div key={i} className="bg-slate-900 p-2 rounded flex gap-2 items-center border border-slate-800 justify-between group">
+                        <div className="flex items-center gap-2">
+                            <span className="font-mono text-slate-500 w-8 text-right">{ev.minute}'</span>
+                            <Club size={12} className={ev.teamId === homeTeamId ? 'text-green-400' : 'text-red-400'}/>
+                            <span>{playerCache[ev.playerId]?.name || 'Loading...'}</span>
+                        </div>
+                        <button onClick={() => deleteEvent(i)} className="text-slate-600 hover:text-red-500 p-1"><Trash2 size={14}/></button>
                     </div>
-                ))}
+                )).reverse()}
             </div>
 
             {/* Scorer Overlay */}
             {scoringTeam && (
-                <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-                    <div className="bg-slate-900 border border-slate-700 rounded-xl p-6 w-full max-w-md">
-                        <h3 className="font-bold text-white mb-4">Torschütze</h3>
+                <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 animate-in fade-in">
+                    <div className="bg-slate-900 border border-slate-700 rounded-xl p-6 w-full max-w-md shadow-2xl">
+                        <h3 className="font-bold text-white mb-4 flex items-center gap-2">
+                            <Club size={20} className={scoringTeam === homeTeamId ? 'text-green-400' : 'text-red-400'}/>
+                            Torschütze wählen
+                        </h3>
                         <div className="grid grid-cols-2 gap-2">
                             {(scoringTeam === homeTeamId ? homeTeam : awayTeam)?.playerIds.map(pid => {
                                 if(!pid) return null;
                                 const p = playerCache[pid];
                                 return (
-                                    <button key={pid} onClick={() => confirmGoal(pid)} className="p-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white rounded text-left truncate">
+                                    <button key={pid} onClick={() => confirmGoal(pid)} className="p-3 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white rounded text-left truncate font-bold transition">
                                         {p ? p.name : 'Lade...'}
                                     </button>
                                 )
                             })}
                         </div>
-                        <button onClick={() => setScoringTeam(null)} className="mt-4 w-full py-2 text-slate-400">Abbrechen</button>
+                        <button onClick={() => setScoringTeam(null)} className="mt-4 w-full py-3 text-slate-400 hover:text-white hover:bg-slate-800 rounded">Abbrechen</button>
                     </div>
                 </div>
             )}
@@ -183,9 +231,9 @@ const MatchView: React.FC = () => {
               <div className="space-y-4">
                   {matchHistory.map(m => (
                       <div key={m.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex justify-between items-center">
-                          <span className="font-bold">{teams.find(t=>t.id===m.homeTeamId)?.name}</span>
+                          <span className="font-bold truncate w-1/3">{teams.find(t=>t.id===m.homeTeamId)?.name}</span>
                           <span className="bg-black/40 px-3 py-1 rounded font-mono font-bold text-xl">{m.homeScore} : {m.awayScore}</span>
-                          <span className="font-bold">{teams.find(t=>t.id===m.awayTeamId)?.name}</span>
+                          <span className="font-bold truncate w-1/3 text-right">{teams.find(t=>t.id===m.awayTeamId)?.name}</span>
                       </div>
                   ))}
                   {matchHistory.length === 0 && <div className="text-center text-slate-500">Keine Spiele.</div>}

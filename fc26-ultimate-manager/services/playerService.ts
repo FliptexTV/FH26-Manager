@@ -41,6 +41,7 @@ export interface UserData {
     username?: string;
     currency: number;
     role?: 'admin' | 'user';
+    linkedPlayerId?: string; // Links this user to a specific Player Card
 }
 
 // Combined listener for Currency AND Role
@@ -59,7 +60,8 @@ export const subscribeToUserData = (callback: (data: UserData) => void) => {
                 id: user.uid,
                 username: data.username || '',
                 currency: data.currency || 0,
-                role: data.role || 'user'
+                role: data.role || 'user',
+                linkedPlayerId: data.linkedPlayerId
             });
         } else {
             // Create user doc if it doesn't exist
@@ -84,6 +86,13 @@ export const getAllUsers = async (): Promise<UserData[]> => {
         users.push({ id: doc.id, ...doc.data() } as UserData);
     });
     return users;
+};
+
+// Admin: Link User to Player
+export const linkUserToPlayer = async (targetUserId: string, playerId: string) => {
+    await updateDoc(doc(db, USERS_COLLECTION, targetUserId), {
+        linkedPlayerId: playerId || null // Set to null if empty string
+    });
 };
 
 // Admin: Give currency to any user

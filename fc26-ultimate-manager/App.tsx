@@ -11,6 +11,7 @@ import {
     updateUserProfile,
     getAllUsers,
     giveUserCurrency,
+    linkUserToPlayer,
     UserData
 } from './services/playerService';
 import { auth, googleProvider } from './services/firebase';
@@ -25,7 +26,7 @@ import MatchView from './components/MatchView';
 import PackOpener from './components/PackOpener';
 import VotingModal from './components/VotingModal';
 import ConfirmationModal from './components/ConfirmationModal';
-import { LayoutGrid, Users, BarChart3, Plus, ShieldCheck, PlayCircle, ArrowUpDown, Package, Gift, CheckCircle2, LogOut, Globe, UserCircle, X, Coins } from 'lucide-react';
+import { LayoutGrid, Users, BarChart3, Plus, ShieldCheck, PlayCircle, ArrowUpDown, Package, Gift, CheckCircle2, LogOut, Globe, UserCircle, X, Coins, UserCog, Ghost, LogIn } from 'lucide-react';
 
 // Namespace import extraction for safety
 const { signInWithPopup, signOut, onAuthStateChanged } = firebaseAuth;
@@ -46,8 +47,8 @@ const App: React.FC = () => {
   
   // Admin & User Mgmt State
   const [isAdmin, setIsAdmin] = useState(false); 
-  const [showAdminUsers, setShowAdminUsers] = useState(false);
-  const [adminUserList, setAdminUserList] = useState<UserData[]>([]);
+  const [showUserList, setShowUserList] = useState(false);
+  const [userList, setUserList] = useState<UserData[]>([]);
   
   // Onboarding State
   const [needsUsername, setNeedsUsername] = useState(false);
@@ -62,9 +63,9 @@ const App: React.FC = () => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       if (!currentUser) {
-          // Default to Admin in Dev Mode (No User) so you can see UI
-          setIsAdmin(true); 
+          setIsAdmin(false); 
           setNeedsUsername(false);
+          setUserData(null);
       }
       setAuthLoading(false);
     });
@@ -73,31 +74,28 @@ const App: React.FC = () => {
 
   // 2. Data Listener
   useEffect(() => {
+    if (!user) return; // Stop data loading if not logged in
+
     setLoadingPlayers(true);
     let unsubUser = () => {};
 
-    if (user) {
-        // Subscribe to User Data (Role & Currency & Username)
-        unsubUser = subscribeToUserData((data) => {
-            setUserData(data);
-            setIsAdmin(data.role === 'admin');
-            
-            // Check if username is missing
-            if (!data.username) {
-                setNeedsUsername(true);
-            } else {
-                setNeedsUsername(false);
-            }
-        });
+    // Subscribe to User Data (Role & Currency & Username)
+    unsubUser = subscribeToUserData((data) => {
+        setUserData(data);
+        setIsAdmin(data.role === 'admin');
+        
+        // Check if username is missing
+        if (!data.username) {
+            setNeedsUsername(true);
+        } else {
+            setNeedsUsername(false);
+        }
+    });
 
-        // Check Daily Bonus
-        checkDailyLoginBonus().then(hasBonus => {
-            if (hasBonus) setToast({ message: "Täglicher Bonus: +5 Punkte!", type: 'success' });
-        });
-    } else {
-        // Dev Mode
-        setIsAdmin(true);
-    }
+    // Check Daily Bonus
+    checkDailyLoginBonus().then(hasBonus => {
+        if (hasBonus) setToast({ message: "Täglicher Bonus: +5 Punkte!", type: 'success' });
+    });
 
     // Subscribe to Players
     const unsubPlayers = subscribeToPlayers((data) => {
@@ -135,11 +133,10 @@ const App: React.FC = () => {
       }
   };
 
-  const loadAdminUsers = async () => {
-      if (!isAdmin) return;
+  const loadUserList = async () => {
       const users = await getAllUsers();
-      setAdminUserList(users);
-      setShowAdminUsers(true);
+      setUserList(users);
+      setShowUserList(true);
   };
 
   const handleGivePoints = async (uid: string, amount: number) => {
@@ -147,7 +144,15 @@ const App: React.FC = () => {
       setToast({ message: `${amount} Punkte gesendet!`, type: 'success' });
       // Refresh list
       const users = await getAllUsers();
-      setAdminUserList(users);
+      setUserList(users);
+  };
+
+  const handleLinkPlayer = async (uid: string, playerId: string) => {
+      await linkUserToPlayer(uid, playerId);
+      setToast({ message: "Karte zugewiesen!", type: 'success' });
+      // Refresh list
+      const users = await getAllUsers();
+      setUserList(users);
   };
 
   // CRUD & Interaction
@@ -208,6 +213,41 @@ const App: React.FC = () => {
 
   if (authLoading) return <div className="h-screen bg-slate-950 flex items-center justify-center text-white font-sans text-xl animate-pulse">Lade Manager...</div>;
 
+  // LOGIN SCREEN (Restored)
+  if (!user) {
+    return (
+      <div className="h-[100dvh] bg-slate-950 flex flex-col items-center justify-center text-white font-sans relative overflow-hidden">
+         {/* Background pattern */}
+         <div className="absolute inset-0 pitch-pattern opacity-10 pointer-events-none"></div>
+         <div className="absolute inset-0 bg-gradient-to-b from-slate-900/50 via-slate-950/80 to-slate-950 pointer-events-none"></div>
+
+         <div className="z-10 flex flex-col items-center p-8 bg-slate-900/50 backdrop-blur-xl rounded-2xl border border-slate-800 shadow-2xl max-w-sm w-full mx-4 animate-in fade-in zoom-in duration-500">
+             <div className="w-20 h-20 bg-gradient-to-tr from-green-500 to-emerald-300 rounded-2xl rotate-6 shadow-[0_0_30px_rgba(34,197,94,0.4)] mb-6 flex items-center justify-center">
+                <span className="text-4xl">⚽</span>
+             </div>
+             
+             <h1 className="text-4xl font-bold italic tracking-tighter mb-1">FC<span className="text-green-400">26</span></h1>
+             <p className="text-slate-400 text-sm mb-8 uppercase tracking-widest font-semibold">Ultimate Manager</p>
+
+             <button 
+                onClick={handleLogin}
+                className="w-full bg-white hover:bg-slate-200 text-slate-900 font-bold py-3.5 px-6 rounded-xl flex items-center justify-center gap-3 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:scale-95 group"
+             >
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                <span>Weiter mit Google</span>
+             </button>
+
+             <div className="mt-8 text-center border-t border-slate-800/50 pt-4 w-full">
+                 <p className="text-[10px] text-slate-600">
+                    Willkommen zurück auf dem Platz.<br/>
+                    <span className="text-slate-500">Logge dich ein, um dein Team zu verwalten.</span>
+                 </p>
+             </div>
+         </div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-[100dvh] bg-slate-950 text-slate-200 flex flex-col font-sans overflow-hidden relative">
       
@@ -234,30 +274,26 @@ const App: React.FC = () => {
         
         <div className="flex items-center gap-4">
             <div className="flex items-center gap-3">
-                {isAdmin && (
-                    <div className="flex gap-2">
-                        <button onClick={loadAdminUsers} className="flex items-center justify-center w-8 h-8 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700">
-                            <UserCircle size={18} />
-                        </button>
+                
+                <div className="flex gap-2">
+                    <button onClick={loadUserList} className="flex items-center justify-center w-8 h-8 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700">
+                        <Users size={18} />
+                    </button>
+                    {isAdmin && (
                         <div className="hidden md:flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold border bg-green-500/10 border-green-500 text-green-400 uppercase tracking-wider">
                             <ShieldCheck size={12}/> Admin
                         </div>
-                    </div>
-                )}
-                {/* Safe user rendering for Dev Mode */}
-                <div className="flex items-center gap-2 bg-slate-800 rounded-full pr-4 pl-1 py-1 border border-slate-700">
-                    <img src={user?.photoURL || 'https://via.placeholder.com/40'} alt="User" className="w-6 h-6 rounded-full border border-slate-600" />
-                    <span className="hidden md:inline text-xs font-bold text-slate-300">{userData?.username || user?.displayName || 'Entwickler'}</span>
+                    )}
                 </div>
-                {user ? (
-                    <button onClick={handleLogout} className="p-2 text-slate-500 hover:text-red-400 transition" title="Abmelden">
-                        <LogOut size={20} />
+
+                {/* User Status / Logout */}
+                <div className="flex items-center gap-2 bg-slate-800 rounded-full pr-1 pl-1 py-1 border border-slate-700">
+                    <img src={user.photoURL || 'https://via.placeholder.com/40'} alt="User" className="w-8 h-8 rounded-full border border-slate-600" />
+                    <span className="hidden md:inline text-xs font-bold text-slate-300 px-2">{userData?.username || user.displayName || 'Spieler'}</span>
+                    <button onClick={handleLogout} className="p-1.5 bg-slate-700 hover:bg-red-500/20 hover:text-red-400 text-slate-400 rounded-full transition ml-1" title="Abmelden">
+                        <LogOut size={16} />
                     </button>
-                ) : (
-                    <button onClick={handleLogin} className="p-2 text-green-500 hover:text-green-400 transition text-xs font-bold uppercase" title="Anmelden">
-                        Login
-                    </button>
-                )}
+                </div>
             </div>
         </div>
       </header>
@@ -382,34 +418,86 @@ const App: React.FC = () => {
           </div>
       )}
 
-      {/* Admin User Management Modal */}
-      {showAdminUsers && (
+      {/* User Management Modal (Visible to all, editable by Admin) */}
+      {showUserList && (
           <div className="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm">
-              <div className="bg-slate-900 border border-slate-700 w-full max-w-2xl max-h-[80vh] flex flex-col rounded-xl">
-                  <div className="p-4 border-b border-slate-800 flex justify-between items-center">
-                      <h2 className="text-xl font-bold text-white flex items-center gap-2"><UserCircle/> User Management</h2>
-                      <button onClick={() => setShowAdminUsers(false)} className="text-slate-400 hover:text-white"><X size={20}/></button>
+              <div className="bg-slate-900 border border-slate-700 w-full max-w-4xl max-h-[85vh] flex flex-col rounded-xl shadow-2xl overflow-hidden">
+                  <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900">
+                      <h2 className="text-xl font-bold text-white flex items-center gap-2"><Users size={24} className="text-green-400"/> Mitglieder & Accounts</h2>
+                      <button onClick={() => setShowUserList(false)} className="text-slate-400 hover:text-white bg-slate-800 rounded-full p-1"><X size={20}/></button>
                   </div>
-                  <div className="p-4 overflow-y-auto flex-1 space-y-2">
-                      {adminUserList.map(u => (
-                          <div key={u.id} className="bg-slate-800/50 p-3 rounded flex items-center justify-between border border-slate-700">
-                              <div>
-                                  <div className="font-bold text-white">{u.username || 'Unbenannt'}</div>
-                                  <div className="text-xs text-slate-500 uppercase flex gap-2">
-                                      {u.role || 'user'} • ID: {u.id?.slice(0,6)}...
-                                  </div>
-                              </div>
-                              <div className="flex items-center gap-4">
-                                  <div className="flex items-center gap-1 text-yellow-500 font-bold">
-                                      <Coins size={16}/> {u.currency}
-                                  </div>
-                                  <div className="flex gap-1">
-                                      <button onClick={() => u.id && handleGivePoints(u.id, 1)} className="bg-slate-700 hover:bg-slate-600 text-xs px-2 py-1 rounded text-white border border-slate-600">+1</button>
-                                      <button onClick={() => u.id && handleGivePoints(u.id, 5)} className="bg-green-700 hover:bg-green-600 text-xs px-2 py-1 rounded text-white border border-green-600">+5</button>
-                                  </div>
-                              </div>
+                  
+                  <div className="p-0 overflow-y-auto flex-1 bg-slate-950/50">
+                      {userList.length === 0 ? (
+                          <div className="text-center p-10 text-slate-500">Keine User gefunden.</div>
+                      ) : (
+                          <div className="divide-y divide-slate-800">
+                              {userList.map(u => {
+                                  const linkedPlayer = u.linkedPlayerId ? players.find(p => p.id === u.linkedPlayerId) : null;
+                                  
+                                  return (
+                                    <div key={u.id} className="p-4 flex flex-col md:flex-row gap-4 md:items-center hover:bg-slate-900 transition">
+                                        {/* User Info */}
+                                        <div className="flex-1">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <span className="font-bold text-lg text-white">{u.username || 'Unbenannt'}</span>
+                                                {linkedPlayer ? (
+                                                    <span className="text-[10px] bg-blue-900 text-blue-200 border border-blue-700 px-2 py-0.5 rounded uppercase font-bold tracking-wider">Spieler</span>
+                                                ) : (
+                                                    <span className="text-[10px] bg-slate-800 text-slate-400 border border-slate-700 px-2 py-0.5 rounded uppercase font-bold tracking-wider flex items-center gap-1"><Ghost size={10}/> Gast</span>
+                                                )}
+                                                {u.role === 'admin' && <span className="text-[10px] bg-red-900/50 text-red-400 border border-red-800 px-2 py-0.5 rounded uppercase font-bold">Admin</span>}
+                                            </div>
+                                            <div className="text-xs text-slate-500 font-mono flex items-center gap-2">
+                                                ID: {u.id?.slice(0,8)}...
+                                                <span className="text-slate-700">|</span>
+                                                <span className="text-yellow-500 flex items-center gap-1"><Coins size={12}/> {u.currency} Pack-Punkte</span>
+                                            </div>
+                                        </div>
+
+                                        {/* Card Linking (Display Only vs Edit) */}
+                                        <div className="flex flex-col md:flex-row gap-3 md:items-center bg-slate-900 p-2 rounded-lg border border-slate-800 min-w-[200px]">
+                                            {linkedPlayer ? (
+                                                <div className="flex items-center gap-3">
+                                                    <img src={linkedPlayer.image} alt="Linked" className="w-10 h-10 rounded-full object-cover border border-slate-600"/>
+                                                    <div className="flex flex-col">
+                                                        <span className="text-xs font-bold text-white">{linkedPlayer.name}</span>
+                                                        <span className="text-[10px] text-yellow-500">Rating: {linkedPlayer.rating}</span>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="text-xs text-slate-500 flex items-center gap-2 px-2">
+                                                    <UserCircle size={16}/> Keine Karte
+                                                </div>
+                                            )}
+
+                                            {isAdmin && (
+                                                <div className="flex flex-col mt-2 md:mt-0 md:ml-2">
+                                                    <select 
+                                                        className="bg-slate-800 text-[10px] text-white border border-slate-700 rounded p-1 w-full md:w-32 focus:border-green-500 outline-none"
+                                                        value={u.linkedPlayerId || ''}
+                                                        onChange={(e) => u.id && handleLinkPlayer(u.id, e.target.value)}
+                                                    >
+                                                        <option value="">-- Zuweisen --</option>
+                                                        {getSortedPlayers().map(p => (
+                                                            <option key={p.id} value={p.id}>{p.name}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Currency Actions (Admin Only) */}
+                                        {isAdmin && (
+                                            <div className="flex items-center gap-2 justify-end">
+                                                <button onClick={() => u.id && handleGivePoints(u.id, 1)} className="bg-slate-800 hover:bg-green-900/30 text-xs px-3 py-2 rounded text-green-400 border border-slate-700 font-bold hover:border-green-800 transition">+1 Pts</button>
+                                            </div>
+                                        )}
+                                    </div>
+                                  );
+                              })}
                           </div>
-                      ))}
+                      )}
                   </div>
               </div>
           </div>

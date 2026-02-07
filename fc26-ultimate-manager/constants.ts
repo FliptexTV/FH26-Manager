@@ -46,26 +46,35 @@ export const NATIONS = [
   { label: 'Welt', flag: '🌍' }
 ];
 
-// Gewichtung der Stats pro Position für die OVR Berechnung (FC Style Logic)
+// Gewichtung der Stats für realistischere OVR Berechnung
+// Werte basieren auf einer Annäherung an echte Algorithmen (wichtigste Stats zählen mehr)
 export const POSITION_WEIGHTS: Record<string, Partial<Record<keyof PlayerStats, number>>> = {
-  [Position.GK]:  { DIV: 0.25, REF: 0.25, HAN: 0.20, POS: 0.20, KIC: 0.05, SPE: 0.05 },
+  // Goalkeeper: Reflexes, Diving, Positioning are key
+  [Position.GK]:  { REF: 0.25, DIV: 0.25, POS: 0.20, HAN: 0.15, KIC: 0.10, SPE: 0.05 },
   
-  [Position.CB]:  { DEF: 0.45, PHY: 0.35, PAC: 0.10, PAS: 0.05, DRI: 0.05 },
-  [Position.LB]:  { DEF: 0.35, PAC: 0.25, PHY: 0.20, PAS: 0.10, DRI: 0.10 },
-  [Position.RB]:  { DEF: 0.35, PAC: 0.25, PHY: 0.20, PAS: 0.10, DRI: 0.10 },
-  [Position.LWB]: { PAC: 0.30, DEF: 0.25, PAS: 0.20, DRI: 0.15, PHY: 0.10 },
-  [Position.RWB]: { PAC: 0.30, DEF: 0.25, PAS: 0.20, DRI: 0.15, PHY: 0.10 },
+  // Center Back: Defense & Physicality dominating
+  [Position.CB]:  { DEF: 0.40, PHY: 0.30, PAC: 0.10, PAS: 0.10, DRI: 0.05, SHO: 0.05 },
   
-  [Position.CDM]: { DEF: 0.35, PAS: 0.25, PHY: 0.25, DRI: 0.10, PAC: 0.05 },
-  [Position.CM]:  { PAS: 0.35, DRI: 0.25, DEF: 0.15, PHY: 0.15, SHO: 0.10 },
-  [Position.CAM]: { PAS: 0.30, DRI: 0.30, SHO: 0.20, PAC: 0.15, PHY: 0.05 },
-  [Position.LM]:  { PAC: 0.35, DRI: 0.30, PAS: 0.20, SHO: 0.10, PHY: 0.05 },
-  [Position.RM]:  { PAC: 0.35, DRI: 0.30, PAS: 0.20, SHO: 0.10, PHY: 0.05 },
+  // Full Backs: Pace, Defense, Dribbling/Passing mixed
+  [Position.LB]:  { PAC: 0.25, DEF: 0.30, DRI: 0.15, PAS: 0.15, PHY: 0.10, SHO: 0.05 },
+  [Position.RB]:  { PAC: 0.25, DEF: 0.30, DRI: 0.15, PAS: 0.15, PHY: 0.10, SHO: 0.05 },
+  [Position.LWB]: { PAC: 0.25, DEF: 0.25, DRI: 0.20, PAS: 0.20, PHY: 0.05, SHO: 0.05 },
+  [Position.RWB]: { PAC: 0.25, DEF: 0.25, DRI: 0.20, PAS: 0.20, PHY: 0.05, SHO: 0.05 },
   
-  [Position.LW]:  { PAC: 0.35, DRI: 0.30, SHO: 0.25, PAS: 0.10 },
-  [Position.RW]:  { PAC: 0.35, DRI: 0.30, SHO: 0.25, PAS: 0.10 },
-  [Position.CF]:  { DRI: 0.30, SHO: 0.30, PAS: 0.25, PAC: 0.15 },
-  [Position.ST]:  { SHO: 0.45, PAC: 0.25, PHY: 0.15, DRI: 0.10, PAS: 0.05 },
+  // Midfielders
+  [Position.CDM]: { DEF: 0.35, PAS: 0.25, PHY: 0.25, DRI: 0.10, PAC: 0.05, SHO: 0.00 },
+  [Position.CM]:  { PAS: 0.35, DRI: 0.25, DEF: 0.10, PHY: 0.10, SHO: 0.10, PAC: 0.10 },
+  [Position.CAM]: { PAS: 0.25, DRI: 0.25, SHO: 0.20, PAC: 0.15, PHY: 0.05, DEF: 0.10 },
+  
+  // Wingers: Pace & Dribbling
+  [Position.LM]:  { PAC: 0.30, DRI: 0.30, PAS: 0.20, SHO: 0.15, PHY: 0.05, DEF: 0.00 },
+  [Position.RM]:  { PAC: 0.30, DRI: 0.30, PAS: 0.20, SHO: 0.15, PHY: 0.05, DEF: 0.00 },
+  [Position.LW]:  { PAC: 0.30, DRI: 0.30, SHO: 0.25, PAS: 0.10, PHY: 0.05, DEF: 0.00 },
+  [Position.RW]:  { PAC: 0.30, DRI: 0.30, SHO: 0.25, PAS: 0.10, PHY: 0.05, DEF: 0.00 },
+  
+  // Forwards
+  [Position.CF]:  { SHO: 0.30, DRI: 0.30, PAS: 0.20, PAC: 0.15, PHY: 0.05, DEF: 0.00 },
+  [Position.ST]:  { SHO: 0.40, PHY: 0.20, PAC: 0.20, DRI: 0.15, PAS: 0.05, DEF: 0.00 },
 };
 
 export const MOCK_PLAYERS: Player[] = [
@@ -191,39 +200,50 @@ export const MOCK_PLAYERS: Player[] = [
   }
 ];
 
-// 5v5 Formations adapted for generic positions
+// 5v5 Formations - Updated strictly to user request
 export const FORMATIONS: Formation[] = [
-  {
-    name: '1-2-1',
-    label: 'Raute (Diamond)',
-    positions: [
-      { x: 50, y: 90, role: Position.GK },
-      { x: 20, y: 60, role: Position.LB },
-      { x: 80, y: 60, role: Position.RB },
-      { x: 50, y: 40, role: Position.CM },
-      { x: 50, y: 10, role: Position.ST },
-    ]
-  },
   {
     name: '2-2',
     label: 'Box (2-2)',
     positions: [
       { x: 50, y: 90, role: Position.GK },
-      { x: 30, y: 70, role: Position.CB },
-      { x: 70, y: 70, role: Position.CB },
-      { x: 30, y: 20, role: Position.ST },
-      { x: 70, y: 20, role: Position.ST },
+      { x: 25, y: 65, role: Position.CB }, // Def 1
+      { x: 75, y: 65, role: Position.CB }, // Def 2
+      { x: 25, y: 25, role: Position.ST }, // Att 1
+      { x: 75, y: 25, role: Position.ST }, // Att 2
     ]
   },
   {
-    name: '1-3-1',
-    label: 'Offensive (1-3-1)',
+    name: '3-1',
+    label: 'Defensiv (3-1)',
     positions: [
       { x: 50, y: 90, role: Position.GK },
-      { x: 50, y: 75, role: Position.CB },
-      { x: 15, y: 45, role: Position.LM },
-      { x: 50, y: 45, role: Position.CAM },
-      { x: 85, y: 45, role: Position.RM },
+      { x: 20, y: 60, role: Position.LB },
+      { x: 50, y: 60, role: Position.CB },
+      { x: 80, y: 60, role: Position.RB },
+      { x: 50, y: 20, role: Position.ST }, // 1 Striker
+    ]
+  },
+  {
+    name: '1-3',
+    label: 'Offensiv (1-3)',
+    positions: [
+      { x: 50, y: 90, role: Position.GK },
+      { x: 50, y: 70, role: Position.CB },
+      { x: 15, y: 30, role: Position.LW },
+      { x: 50, y: 20, role: Position.ST },
+      { x: 85, y: 30, role: Position.RW },
+    ]
+  },
+  {
+    name: '1-2-1',
+    label: 'Raute (1-2-1)',
+    positions: [
+      { x: 50, y: 90, role: Position.GK },
+      { x: 50, y: 75, role: Position.CB }, // Tiefer IV
+      { x: 20, y: 50, role: Position.LM }, // Breit Links
+      { x: 80, y: 50, role: Position.RM }, // Breit Rechts
+      { x: 50, y: 20, role: Position.ST }, // Spitze
     ]
   }
 ];

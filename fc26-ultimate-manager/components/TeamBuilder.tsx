@@ -1,11 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
-import { Player, Formation, Team } from '../types';
+import { Player, Formation, Team, Position } from '../types';
 import { FORMATIONS } from '../constants';
 import { saveTeam, getTeams, deleteTeam } from '../services/playerService';
 import PlayerCard from './PlayerCard';
 import ConfirmationModal from './ConfirmationModal';
-import { Plus, Save, Trash2, Check, Wand2, X, Loader2, RefreshCcw, FolderHeart, Users, CheckSquare, Square, AlertTriangle } from 'lucide-react';
+import { Plus, Save, Trash2, Check, Wand2, X, Loader2, RefreshCcw, FolderHeart, Users, CheckSquare, Square, AlertTriangle, Shield } from 'lucide-react';
 
 interface TeamBuilderProps {
   allPlayers: Player[]; 
@@ -23,11 +23,10 @@ const TeamBuilder: React.FC<TeamBuilderProps> = ({ allPlayers }) => {
 
   // Generator State
   const [showGenerator, setShowGenerator] = useState(false);
-  const [genCount, setGenCount] = useState(2); // Default to 2 for a match
+  const [genCount, setGenCount] = useState(2); 
   const [isGenerating, setIsGenerating] = useState(false);
   const [poolSelection, setPoolSelection] = useState<Set<string>>(new Set());
 
-  // Load Saved Teams on Mount
   useEffect(() => {
     const loadData = async () => {
         const t = await getTeams();
@@ -56,7 +55,6 @@ const TeamBuilder: React.FC<TeamBuilderProps> = ({ allPlayers }) => {
       if (newSet.has(id)) {
           newSet.delete(id);
       } else {
-          // STRICT LIMIT CHECK
           if (newSet.size >= requiredPoolSize) return;
           newSet.add(id);
       }
@@ -67,13 +65,12 @@ const TeamBuilder: React.FC<TeamBuilderProps> = ({ allPlayers }) => {
       setPoolSelection(new Set());
   };
 
-  // --- LOGIC: FILL CURRENT TEAM ---
   const fillCurrentTeam = () => {
       const newTeam = [...team];
       const usedIds = new Set(newTeam.map(p => p?.id).filter(Boolean));
 
       currentFormation.positions.forEach((pos, index) => {
-          if (newTeam[index]) return; // Skip filled slots
+          if (newTeam[index]) return; 
           let candidates = allPlayers.filter(p => p.position === pos.role && !usedIds.has(p.id));
           if (candidates.length === 0) candidates = allPlayers.filter(p => !usedIds.has(p.id));
 
@@ -89,47 +86,59 @@ const TeamBuilder: React.FC<TeamBuilderProps> = ({ allPlayers }) => {
       setShowGenerator(false);
   };
 
-  // --- LOGIC: BULK GENERATE TEAMS (ONLY POOL) ---
+  // --- GREEDY BALANCING ALGORITHM ---
   const handleBulkGenerate = async () => {
-      // Validate
-      if (poolSelection.size !== requiredPoolSize) {
-           return; // Button should be disabled anyway
-      }
+      if (poolSelection.size !== requiredPoolSize) return;
 
       setIsGenerating(true);
       
+      // 1. Get pool and sort by Rating (desc)
       const availablePool = allPlayers.filter(p => poolSelection.has(p.id));
+      availablePool.sort((a, b) => b.rating - a.rating);
 
-      // Shuffle logic
-      const shuffle = (array: Player[]) => {
-          let currentIndex = array.length, randomIndex;
-          while (currentIndex != 0) {
-              randomIndex = Math.floor(Math.random() * currentIndex);
-              currentIndex--;
-              [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
-          }
-          return array;
-      };
+      // 2. Initialize Empty Teams
+      const teamsData: { players: Player[], totalRating: number }[] = Array.from({ length: genCount }, () => ({
+          players: [],
+          totalRating: 0
+      }));
 
-      let masterList = shuffle([...availablePool]);
-      let masterIndex = 0;
+      // 3. Greedy Distribution: Give strongest remaining player to the team with lowest current rating
+      availablePool.forEach(player => {
+          // Find team with lowest total rating
+          let weakestTeamIndex = 0;
+          let minRating = Infinity;
 
+          teamsData.forEach((t, idx) => {
+              if (t.totalRating < minRating) {
+                  minRating = t.totalRating;
+                  weakestTeamIndex = idx;
+              }
+          });
+
+          // Add player to that team
+          teamsData[weakestTeamIndex].players.push(player);
+          teamsData[weakestTeamIndex].totalRating += player.rating;
+      });
+
+      // 4. Convert to Team Format and Save
+      // Note: We ignore positions for strict balancing, but we try to slot them somewhat correctly if possible?
+      // For now, we just fill the slots 0-4.
+      
       for (let i = 0; i < genCount; i++) {
           const rndFormation = FORMATIONS[Math.floor(Math.random() * FORMATIONS.length)];
-          const teamIds: (string|null)[] = [];
+          const assignedPlayers = teamsData[i].players;
           
-          for (let k = 0; k < 5; k++) {
-              if (masterIndex < masterList.length) {
-                  teamIds.push(masterList[masterIndex].id);
-                  masterIndex++;
-              } else {
-                  teamIds.push(null);
-              }
-          }
+          // Simple fill (Improvement: could try to match positions to slots here, but balancing was priority)
+          const teamIds = assignedPlayers.map(p => p.id);
+          
+          // Pad if somehow logic failed (shouldn't happen with strict pool)
+          while(teamIds.length < 5) teamIds.push(null);
+
+          const avg = Math.round(teamsData[i].totalRating / 5);
 
           const newTeam: Team = {
               id: Date.now().toString() + Math.random().toString().slice(2,5),
-              name: `Team ${savedTeams.length + i + 1} (Pool)`,
+              name: `Team ${savedTeams.length + i + 1} (Ø ${avg})`,
               formationName: rndFormation.name,
               playerIds: teamIds,
               createdAt: Date.now() + i
@@ -206,6 +215,10 @@ const TeamBuilder: React.FC<TeamBuilderProps> = ({ allPlayers }) => {
                 <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2 shrink-0">
                     <Wand2 className="text-purple-400" /> Team Generator
                 </h2>
+                
+                <div className="bg-blue-900/20 border border-blue-500/20 p-2 rounded mb-4 text-xs text-blue-200">
+                    <strong>Balancing Aktiv:</strong> Teams werden fair nach OVR (Stärke) aufgeteilt. Positionen werden dabei ignoriert, um Gleichgewicht zu garantieren.
+                </div>
 
                 <div className="overflow-y-auto pr-2 space-y-6 flex-1">
                     
@@ -222,7 +235,7 @@ const TeamBuilder: React.FC<TeamBuilderProps> = ({ allPlayers }) => {
                             value={genCount} 
                             onChange={(e) => {
                                 setGenCount(parseInt(e.target.value));
-                                setPoolSelection(new Set()); // Reset selection when count changes to avoid confusion
+                                setPoolSelection(new Set()); 
                             }}
                             className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-purple-500"
                         />
@@ -263,6 +276,7 @@ const TeamBuilder: React.FC<TeamBuilderProps> = ({ allPlayers }) => {
                                         >
                                             {isSelected ? <CheckSquare size={14} className="text-purple-400"/> : <Square size={14} className="text-slate-600"/>}
                                             <span className={`text-xs truncate ${isSelected ? 'text-white font-bold' : 'text-slate-400'}`}>{p.name}</span>
+                                            <span className="text-[10px] bg-slate-800 px-1 rounded text-yellow-500 font-mono ml-auto">{p.rating}</span>
                                         </div>
                                      );
                                  })}
@@ -282,7 +296,7 @@ const TeamBuilder: React.FC<TeamBuilderProps> = ({ allPlayers }) => {
                         className="w-full py-3 bg-purple-600 hover:bg-purple-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold rounded-lg shadow-lg shadow-purple-900/20 flex items-center justify-center gap-2 transition"
                     >
                         {isGenerating ? <Loader2 className="animate-spin" /> : <Wand2 size={18} />}
-                        {isGenerating ? 'Würfelt...' : 'Teams Generieren'}
+                        {isGenerating ? 'Würfelt...' : 'Teams Generieren (Balanced)'}
                     </button>
                     
                     <div className="border-t border-slate-800 pt-4">
@@ -328,13 +342,18 @@ const TeamBuilder: React.FC<TeamBuilderProps> = ({ allPlayers }) => {
          <div className="relative w-full max-w-[500px] aspect-[2/3] bg-pitch-dark m-4 rounded-lg overflow-hidden border-2 border-white/20 pitch-pattern mt-20 shadow-[0_0_50px_rgba(0,0,0,0.5)] scale-90 md:scale-100 origin-top">
             {currentFormation.positions.map((pos, index) => {
                 const player = team[index];
+                const isGK = pos.role === Position.GK;
+                
                 return (
                 <div key={index} className="absolute transform -translate-x-1/2 -translate-y-1/2" style={{ left: `${pos.x}%`, top: `${100 - pos.y}%` }}>
                     {player ? (
                         <div onClick={() => setActiveSlot(index)}><PlayerCard player={player} size="sm" /></div>
                     ) : (
-                        <button onClick={() => setActiveSlot(index)} className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-black/20 border-2 border-dashed border-white/30 flex items-center justify-center text-white/50 hover:bg-white/10 hover:border-white transition">
-                            <Plus size={24}/>
+                        <button 
+                            onClick={() => setActiveSlot(index)} 
+                            className={`w-14 h-14 md:w-16 md:h-16 rounded-full bg-black/20 border-2 border-dashed flex items-center justify-center transition ${isGK ? 'border-orange-500/70 text-orange-400 bg-orange-500/10' : 'border-white/30 text-white/50 hover:bg-white/10 hover:border-white'}`}
+                        >
+                            {isGK ? <Shield size={24}/> : <Plus size={24}/>}
                         </button>
                     )}
                 </div>
