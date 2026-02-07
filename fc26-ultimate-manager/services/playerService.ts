@@ -37,6 +37,8 @@ export const getUserId = (): string => {
 // --- USER DATA & ADMIN ---
 
 export interface UserData {
+    id?: string;
+    username?: string;
     currency: number;
     role?: 'admin' | 'user';
 }
@@ -54,14 +56,40 @@ export const subscribeToUserData = (callback: (data: UserData) => void) => {
         if (docSnap.exists()) {
             const data = docSnap.data();
             callback({ 
+                id: user.uid,
+                username: data.username || '',
                 currency: data.currency || 0,
                 role: data.role || 'user'
             });
         } else {
             // Create user doc if it doesn't exist
-            setDoc(userDocRef, { currency: 0, role: 'user' }, { merge: true });
-            callback({ currency: 0, role: 'user' });
+            setDoc(userDocRef, { currency: 0, role: 'user', username: '' }, { merge: true });
+            callback({ currency: 0, role: 'user', username: '' });
         }
+    });
+};
+
+export const updateUserProfile = async (username: string) => {
+    const user = auth.currentUser;
+    if (!user) return;
+    await setDoc(doc(db, USERS_COLLECTION, user.uid), { username }, { merge: true });
+};
+
+// Admin: Get all users
+export const getAllUsers = async (): Promise<UserData[]> => {
+    const q = query(collection(db, USERS_COLLECTION));
+    const snapshot = await getDocs(q);
+    const users: UserData[] = [];
+    snapshot.forEach(doc => {
+        users.push({ id: doc.id, ...doc.data() } as UserData);
+    });
+    return users;
+};
+
+// Admin: Give currency to any user
+export const giveUserCurrency = async (targetUserId: string, amount: number) => {
+    await updateDoc(doc(db, USERS_COLLECTION, targetUserId), {
+        currency: increment(amount)
     });
 };
 

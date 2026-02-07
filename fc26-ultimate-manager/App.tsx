@@ -7,7 +7,11 @@ import {
     deleteFromDatabase, 
     checkDailyLoginBonus, 
     addCurrency,
-    subscribeToUserData
+    subscribeToUserData,
+    updateUserProfile,
+    getAllUsers,
+    giveUserCurrency,
+    UserData
 } from './services/playerService';
 import { auth, googleProvider } from './services/firebase';
 import * as firebaseAuth from 'firebase/auth';
@@ -21,7 +25,7 @@ import MatchView from './components/MatchView';
 import PackOpener from './components/PackOpener';
 import VotingModal from './components/VotingModal';
 import ConfirmationModal from './components/ConfirmationModal';
-import { LayoutGrid, Users, BarChart3, Plus, ShieldCheck, PlayCircle, ArrowUpDown, Package, Gift, CheckCircle2, LogOut, Globe } from 'lucide-react';
+import { LayoutGrid, Users, BarChart3, Plus, ShieldCheck, PlayCircle, ArrowUpDown, Package, Gift, CheckCircle2, LogOut, Globe, UserCircle, X, Coins } from 'lucide-react';
 
 // Namespace import extraction for safety
 const { signInWithPopup, signOut, onAuthStateChanged } = firebaseAuth;
@@ -30,6 +34,7 @@ const App: React.FC = () => {
   // Auth State
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [userData, setUserData] = useState<UserData | null>(null);
 
   const [view, setView] = useState<ViewState>('players');
   const [players, setPlayers] = useState<Player[]>([]);
@@ -39,8 +44,14 @@ const App: React.FC = () => {
   const [votingPlayer, setVotingPlayer] = useState<Player | undefined>(undefined);
   const [isFormOpen, setIsFormOpen] = useState(false);
   
-  // Admin State
+  // Admin & User Mgmt State
   const [isAdmin, setIsAdmin] = useState(false); 
+  const [showAdminUsers, setShowAdminUsers] = useState(false);
+  const [adminUserList, setAdminUserList] = useState<UserData[]>([]);
+  
+  // Onboarding State
+  const [needsUsername, setNeedsUsername] = useState(false);
+  const [newUsername, setNewUsername] = useState('');
   
   const [playerToDelete, setPlayerToDelete] = useState<string | null>(null);
   const [toast, setToast] = useState<{message: string, type: 'success' | 'info'} | null>(null);
@@ -51,7 +62,9 @@ const App: React.FC = () => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       if (!currentUser) {
-          setIsAdmin(false); 
+          // Default to Admin in Dev Mode (No User) so you can see UI
+          setIsAdmin(true); 
+          setNeedsUsername(false);
       }
       setAuthLoading(false);
     });
@@ -60,19 +73,31 @@ const App: React.FC = () => {
 
   // 2. Data Listener
   useEffect(() => {
-    if (!user) return; // Don't fetch data if not logged in
-
     setLoadingPlayers(true);
-    
-    // Subscribe to User Data (Role & Currency)
-    const unsubUser = subscribeToUserData((data) => {
-        setIsAdmin(data.role === 'admin');
-    });
+    let unsubUser = () => {};
 
-    // Check Daily Bonus
-    checkDailyLoginBonus().then(hasBonus => {
-        if (hasBonus) setToast({ message: "Täglicher Bonus: +5 Punkte!", type: 'success' });
-    });
+    if (user) {
+        // Subscribe to User Data (Role & Currency & Username)
+        unsubUser = subscribeToUserData((data) => {
+            setUserData(data);
+            setIsAdmin(data.role === 'admin');
+            
+            // Check if username is missing
+            if (!data.username) {
+                setNeedsUsername(true);
+            } else {
+                setNeedsUsername(false);
+            }
+        });
+
+        // Check Daily Bonus
+        checkDailyLoginBonus().then(hasBonus => {
+            if (hasBonus) setToast({ message: "Täglicher Bonus: +5 Punkte!", type: 'success' });
+        });
+    } else {
+        // Dev Mode
+        setIsAdmin(true);
+    }
 
     // Subscribe to Players
     const unsubPlayers = subscribeToPlayers((data) => {
@@ -99,6 +124,30 @@ const App: React.FC = () => {
   const handleLogout = async () => {
       await signOut(auth);
       setView('players');
+  };
+
+  const handleSubmitUsername = async () => {
+      if (newUsername.trim().length > 2) {
+          await updateUserProfile(newUsername.trim());
+          setNeedsUsername(false);
+      } else {
+          alert("Name muss mind. 3 Zeichen haben.");
+      }
+  };
+
+  const loadAdminUsers = async () => {
+      if (!isAdmin) return;
+      const users = await getAllUsers();
+      setAdminUserList(users);
+      setShowAdminUsers(true);
+  };
+
+  const handleGivePoints = async (uid: string, amount: number) => {
+      await giveUserCurrency(uid, amount);
+      setToast({ message: `${amount} Punkte gesendet!`, type: 'success' });
+      // Refresh list
+      const users = await getAllUsers();
+      setAdminUserList(users);
   };
 
   // CRUD & Interaction
@@ -159,43 +208,6 @@ const App: React.FC = () => {
 
   if (authLoading) return <div className="h-screen bg-slate-950 flex items-center justify-center text-white font-sans text-xl animate-pulse">Lade Manager...</div>;
 
-  // --- LOGIN SCREEN (MANDATORY) ---
-  if (!user) {
-    return (
-        <div className="h-[100dvh] bg-slate-950 flex flex-col items-center justify-center p-4 relative overflow-hidden font-sans">
-            {/* Background FX */}
-            <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]"></div>
-            <div className="absolute top-0 left-0 w-full h-full bg-slate-950/80 radial-gradient"></div>
-            <div className="w-96 h-96 bg-green-500/10 rounded-full blur-[128px] absolute top-1/4 left-1/4 animate-pulse"></div>
-            <div className="w-96 h-96 bg-blue-500/10 rounded-full blur-[128px] absolute bottom-1/4 right-1/4 animate-pulse delay-700"></div>
-
-            <div className="relative z-10 bg-slate-900/50 backdrop-blur-xl border border-slate-800 p-8 md:p-12 rounded-3xl shadow-2xl max-w-md w-full text-center">
-                <div className="w-20 h-20 bg-gradient-to-tr from-green-500 to-emerald-300 rounded-2xl rotate-6 shadow-[0_0_40px_rgba(34,197,94,0.4)] mx-auto mb-8 flex items-center justify-center">
-                    <span className="text-4xl">⚽</span>
-                </div>
-                
-                <h1 className="text-5xl font-black text-white mb-2 tracking-tighter uppercase italic">
-                    FH<span className="text-green-400">26</span>
-                </h1>
-                <p className="text-slate-400 mb-10 font-light text-lg tracking-wide uppercase">Ultimate Manager</p>
-
-                <button 
-                    onClick={handleLogin} 
-                    className="w-full bg-white hover:bg-slate-200 text-slate-950 py-4 rounded-xl font-bold text-lg transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-xl flex items-center justify-center gap-3"
-                >
-                    <svg className="w-6 h-6" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
-                    <span>Login mit Google</span>
-                </button>
-            </div>
-            
-            <div className="absolute bottom-8 text-center text-slate-600 text-xs">
-                &copy; 2026 FC Ultimate Manager. Powered by React & Firebase.
-            </div>
-        </div>
-    );
-  }
-
-  // --- MAIN APP (Authenticated) ---
   return (
     <div className="h-[100dvh] bg-slate-950 text-slate-200 flex flex-col font-sans overflow-hidden relative">
       
@@ -223,17 +235,29 @@ const App: React.FC = () => {
         <div className="flex items-center gap-4">
             <div className="flex items-center gap-3">
                 {isAdmin && (
-                    <div className="hidden md:flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold border bg-green-500/10 border-green-500 text-green-400 uppercase tracking-wider">
-                        <ShieldCheck size={12}/> Admin
+                    <div className="flex gap-2">
+                        <button onClick={loadAdminUsers} className="flex items-center justify-center w-8 h-8 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700">
+                            <UserCircle size={18} />
+                        </button>
+                        <div className="hidden md:flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold border bg-green-500/10 border-green-500 text-green-400 uppercase tracking-wider">
+                            <ShieldCheck size={12}/> Admin
+                        </div>
                     </div>
                 )}
+                {/* Safe user rendering for Dev Mode */}
                 <div className="flex items-center gap-2 bg-slate-800 rounded-full pr-4 pl-1 py-1 border border-slate-700">
-                    <img src={user.photoURL || ''} alt="User" className="w-6 h-6 rounded-full border border-slate-600" />
-                    <span className="hidden md:inline text-xs font-bold text-slate-300">{user.displayName}</span>
+                    <img src={user?.photoURL || 'https://via.placeholder.com/40'} alt="User" className="w-6 h-6 rounded-full border border-slate-600" />
+                    <span className="hidden md:inline text-xs font-bold text-slate-300">{userData?.username || user?.displayName || 'Entwickler'}</span>
                 </div>
-                <button onClick={handleLogout} className="p-2 text-slate-500 hover:text-red-400 transition" title="Abmelden">
-                    <LogOut size={20} />
-                </button>
+                {user ? (
+                    <button onClick={handleLogout} className="p-2 text-slate-500 hover:text-red-400 transition" title="Abmelden">
+                        <LogOut size={20} />
+                    </button>
+                ) : (
+                    <button onClick={handleLogin} className="p-2 text-green-500 hover:text-green-400 transition text-xs font-bold uppercase" title="Anmelden">
+                        Login
+                    </button>
+                )}
             </div>
         </div>
       </header>
@@ -286,7 +310,7 @@ const App: React.FC = () => {
             {loadingPlayers ? (
                 <div className="text-center py-20 text-slate-500 animate-pulse">Lade Datenbank...</div>
             ) : (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6 justify-items-center perspective-[1000px]">
+                <div className="grid grid-cols-1 min-[480px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6 justify-items-center perspective-[1000px]">
                 {getSortedPlayers().map(player => (
                     <PlayerCard 
                     key={player.id} 
@@ -300,7 +324,7 @@ const App: React.FC = () => {
                 ))}
                 
                 {isAdmin && (
-                    <div onClick={openCreate} className="w-48 h-[296px] rounded-t-2xl rounded-b-[2rem] border-2 border-dashed border-slate-700 hover:border-green-500 bg-slate-900/50 flex flex-col items-center justify-center cursor-pointer group transition-all">
+                    <div onClick={openCreate} className="w-48 h-[360px] rounded-t-2xl rounded-b-[2.5rem] border-2 border-dashed border-slate-700 hover:border-green-500 bg-slate-900/50 flex flex-col items-center justify-center cursor-pointer group transition-all">
                         <Plus size={32} className="text-slate-500 group-hover:text-green-400" />
                         <span className="mt-4 text-sm font-medium text-slate-500 group-hover:text-green-400">Erstellen</span>
                     </div>
@@ -337,6 +361,59 @@ const App: React.FC = () => {
           <button onClick={() => setView('packs')} className={`p-3 rounded-xl transition hover:bg-slate-800 ${view === 'packs' ? 'bg-slate-800 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.2)]' : 'text-slate-400'}`}><Package size={24} /></button>
           <button onClick={() => setView('stats')} className={`p-3 rounded-xl transition hover:bg-slate-800 ${view === 'stats' ? 'bg-slate-800 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.2)]' : 'text-slate-400'}`}><BarChart3 size={24} /></button>
       </div>
+      
+      {/* Onboarding Modal */}
+      {needsUsername && (
+          <div className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-4">
+              <div className="bg-slate-900 p-8 rounded-xl border border-slate-700 w-full max-w-md text-center">
+                  <h2 className="text-2xl font-bold text-white mb-4">Willkommen Manager!</h2>
+                  <p className="text-slate-400 mb-6">Bitte wähle einen Namen für deinen Verein / Account.</p>
+                  <input 
+                    type="text" 
+                    placeholder="Dein Name"
+                    value={newUsername}
+                    onChange={(e) => setNewUsername(e.target.value)}
+                    className="w-full bg-slate-800 border border-slate-700 p-3 rounded text-white mb-4 text-center text-lg font-bold"
+                  />
+                  <button onClick={handleSubmitUsername} className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded">
+                      Los geht's
+                  </button>
+              </div>
+          </div>
+      )}
+
+      {/* Admin User Management Modal */}
+      {showAdminUsers && (
+          <div className="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm">
+              <div className="bg-slate-900 border border-slate-700 w-full max-w-2xl max-h-[80vh] flex flex-col rounded-xl">
+                  <div className="p-4 border-b border-slate-800 flex justify-between items-center">
+                      <h2 className="text-xl font-bold text-white flex items-center gap-2"><UserCircle/> User Management</h2>
+                      <button onClick={() => setShowAdminUsers(false)} className="text-slate-400 hover:text-white"><X size={20}/></button>
+                  </div>
+                  <div className="p-4 overflow-y-auto flex-1 space-y-2">
+                      {adminUserList.map(u => (
+                          <div key={u.id} className="bg-slate-800/50 p-3 rounded flex items-center justify-between border border-slate-700">
+                              <div>
+                                  <div className="font-bold text-white">{u.username || 'Unbenannt'}</div>
+                                  <div className="text-xs text-slate-500 uppercase flex gap-2">
+                                      {u.role || 'user'} • ID: {u.id?.slice(0,6)}...
+                                  </div>
+                              </div>
+                              <div className="flex items-center gap-4">
+                                  <div className="flex items-center gap-1 text-yellow-500 font-bold">
+                                      <Coins size={16}/> {u.currency}
+                                  </div>
+                                  <div className="flex gap-1">
+                                      <button onClick={() => u.id && handleGivePoints(u.id, 1)} className="bg-slate-700 hover:bg-slate-600 text-xs px-2 py-1 rounded text-white border border-slate-600">+1</button>
+                                      <button onClick={() => u.id && handleGivePoints(u.id, 5)} className="bg-green-700 hover:bg-green-600 text-xs px-2 py-1 rounded text-white border border-green-600">+5</button>
+                                  </div>
+                              </div>
+                          </div>
+                      ))}
+                  </div>
+              </div>
+          </div>
+      )}
 
       {isFormOpen && <PlayerForm initialPlayer={editingPlayer} onSave={handleSavePlayer} onCancel={() => setIsFormOpen(false)} />}
       {votingPlayer && <VotingModal player={votingPlayer} onClose={() => setVotingPlayer(undefined)} onUpdate={handlePlayerUpdate} />}
