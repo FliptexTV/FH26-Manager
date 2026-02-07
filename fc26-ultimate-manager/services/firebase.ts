@@ -1,7 +1,6 @@
 
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
-// import { getAuth, GoogleAuthProvider } from "firebase/auth"; // Fix: Use namespace import
 import * as firebaseAuth from "firebase/auth";
 import { getStorage } from "firebase/storage";
 
@@ -21,7 +20,6 @@ const app = initializeApp(firebaseConfig);
 
 // Export Services
 export const db = getFirestore(app);
-// Fix: Use namespace import methods
 export const auth = firebaseAuth.getAuth(app);
 export const googleProvider = new firebaseAuth.GoogleAuthProvider();
 export const storage = getStorage(app);

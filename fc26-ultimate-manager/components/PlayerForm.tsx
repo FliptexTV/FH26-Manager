@@ -21,7 +21,8 @@ const PlayerForm: React.FC<PlayerFormProps> = ({ initialPlayer, onSave, onCancel
     image: 'https://picsum.photos/200',
     cardType: 'gold',
     nation: '🇩🇪',
-    stats: { PAC: 75, SHO: 75, PAS: 75, DRI: 75, DEF: 50, PHY: 70 }
+    stats: { PAC: 75, SHO: 75, PAS: 75, DRI: 75, DEF: 50, PHY: 70 },
+    club: ''
   });
 
   const [autoCalculate, setAutoCalculate] = useState(true);
@@ -95,21 +96,22 @@ const PlayerForm: React.FC<PlayerFormProps> = ({ initialPlayer, onSave, onCancel
   );
 
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 backdrop-blur-sm font-sans">
       <div className="bg-slate-900 border border-slate-700 w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-xl shadow-2xl">
         <div className="flex justify-between items-center p-6 border-b border-slate-800">
-          <h2 className="text-2xl font-bold text-white">Spieler {initialPlayer ? 'bearbeiten' : 'erstellen'}</h2>
+          <h2 className="text-2xl font-bold text-white uppercase tracking-wider">Spieler {initialPlayer ? 'bearbeiten' : 'erstellen'}</h2>
           <button onClick={onCancel} className="text-slate-400 hover:text-white"><X size={24} /></button>
         </div>
 
         <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
           <div className="space-y-4">
-             {/* Name & Nation Inputs (Simplified for brevity, logic remains same) */}
+             {/* Name */}
             <div>
               <label className="block text-sm font-medium text-slate-400 mb-1">Name</label>
               <input name="name" value={formData.name} onChange={handleChange} className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white" placeholder="Name" />
             </div>
             
+             {/* Image Url */}
             <div>
                <label className="block text-sm font-medium text-slate-400 mb-1">Bild</label>
                <div className="flex gap-4">
@@ -130,17 +132,49 @@ const PlayerForm: React.FC<PlayerFormProps> = ({ initialPlayer, onSave, onCancel
                </div>
             </div>
             
-            {/* ... Other inputs (Position, Nation, Rating) kept from previous state implicitly ... */}
-             <div>
-              <label className="block text-sm font-medium text-slate-400 mb-1">Position</label>
-              <select name="position" value={formData.position} onChange={handleChange} className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white">
-                  {Object.values(Position).map(p => <option key={p} value={p}>{p}</option>)}
-              </select>
+            {/* Position & Card Type Row */}
+            <div className="grid grid-cols-2 gap-4">
+                 <div>
+                    <label className="block text-sm font-medium text-slate-400 mb-1">Position</label>
+                    <select name="position" value={formData.position} onChange={handleChange} className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white font-sans">
+                        {Object.values(Position).map(p => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-slate-400 mb-1">Kartentyp</label>
+                    <select name="cardType" value={formData.cardType} onChange={handleChange} className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white font-sans">
+                        <option value="gold">Standard Gold</option>
+                        <option value="inform">Inform (TOTW)</option>
+                        <option value="icon">Icon / Legende</option>
+                    </select>
+                </div>
             </div>
+
+            {/* Nation & Club Row */}
+            <div className="grid grid-cols-2 gap-4">
+                 <div>
+                    <label className="block text-sm font-medium text-slate-400 mb-1">Nation</label>
+                    <select name="nation" value={formData.nation} onChange={handleChange} className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white font-sans">
+                        {NATIONS.map(n => <option key={n.label} value={n.flag}>{n.label} {n.flag}</option>)}
+                    </select>
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-slate-400 mb-1">Verein</label>
+                    <input name="club" value={formData.club || ''} onChange={handleChange} className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white" placeholder="z.B. FC Bayern" />
+                </div>
+            </div>
+
           </div>
 
+          {/* Right Side: Stats */}
           <div className="bg-slate-800/30 p-4 rounded-xl border border-slate-700/50">
-            <h3 className="text-sm font-semibold text-slate-300 uppercase mb-4">Attribute</h3>
+            <div className="flex justify-between items-center mb-4">
+                 <h3 className="text-sm font-semibold text-slate-300 uppercase">Attribute</h3>
+                 <div className="flex items-center gap-2 bg-slate-800 px-3 py-1 rounded border border-slate-700">
+                     <span className="text-xs text-slate-400">Rating</span>
+                     <span className="text-xl font-bold text-yellow-400">{formData.rating}</span>
+                 </div>
+            </div>
             <div className="grid grid-cols-2 gap-4">
               {isGK ? (
                 <> {renderStatInput('DIV', 'DIV')} {renderStatInput('REF', 'REF')} {renderStatInput('HAN', 'HAN')} {renderStatInput('SPE', 'SPE')} {renderStatInput('KIC', 'KIC')} {renderStatInput('POS', 'POS')} </>
@@ -148,12 +182,19 @@ const PlayerForm: React.FC<PlayerFormProps> = ({ initialPlayer, onSave, onCancel
                 <> {renderStatInput('PAC', 'PAC')} {renderStatInput('SHO', 'SHO')} {renderStatInput('PAS', 'PAS')} {renderStatInput('DRI', 'DRI')} {renderStatInput('DEF', 'DEF')} {renderStatInput('PHY', 'PHY')} </>
               )}
             </div>
+            
+            <div className="mt-6">
+                <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={autoCalculate} onChange={(e) => setAutoCalculate(e.target.checked)} className="rounded bg-slate-700 border-slate-600 text-green-500 focus:ring-green-500" />
+                    <span className="text-xs text-slate-400">Rating automatisch berechnen</span>
+                </label>
+            </div>
           </div>
         </div>
 
         <div className="p-6 border-t border-slate-800 flex justify-end gap-3 bg-slate-900 sticky bottom-0 z-10">
           <button onClick={onCancel} className="px-4 py-2 text-slate-300">Abbrechen</button>
-          <button onClick={() => onSave(formData)} disabled={isUploading} className="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded shadow-lg">
+          <button onClick={() => onSave(formData)} disabled={isUploading} className="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded shadow-lg uppercase tracking-wider">
              {isUploading ? 'Lädt hoch...' : 'Speichern'}
           </button>
         </div>

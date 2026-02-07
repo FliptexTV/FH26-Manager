@@ -61,7 +61,7 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
   
   const shapeClass = "rounded-t-2xl rounded-b-[2.5rem]";
   const isSmall = size === 'sm';
-  const textContainerPosition = isSmall ? 'bottom-[6%]' : 'bottom-[7%]';
+  const textContainerPosition = isSmall ? 'bottom-[16%]' : 'bottom-[9%]';
 
   // --- TILT LOGIC ---
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {

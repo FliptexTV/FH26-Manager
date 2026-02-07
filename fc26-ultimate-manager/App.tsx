@@ -10,9 +10,8 @@ import {
     subscribeToUserData
 } from './services/playerService';
 import { auth, googleProvider } from './services/firebase';
-import { signInWithPopup, signOut, onAuthStateChanged, User } from 'firebase/auth';
-// Fix: Import * as firebaseAuth to resolve missing member errors
 import * as firebaseAuth from 'firebase/auth';
+import type { User } from 'firebase/auth';
 
 import PlayerCard from './components/PlayerCard';
 import PlayerForm from './components/PlayerForm';
@@ -22,12 +21,14 @@ import MatchView from './components/MatchView';
 import PackOpener from './components/PackOpener';
 import VotingModal from './components/VotingModal';
 import ConfirmationModal from './components/ConfirmationModal';
-import { LayoutGrid, Users, BarChart3, Plus, ShieldCheck, PlayCircle, ArrowUpDown, Package, Gift, CheckCircle2, LogIn, LogOut, Globe } from 'lucide-react';
+import { LayoutGrid, Users, BarChart3, Plus, ShieldCheck, PlayCircle, ArrowUpDown, Package, Gift, CheckCircle2, LogIn, LogOut, Globe, Code2 } from 'lucide-react';
+
+// Namespace import extraction for safety
+const { signInWithPopup, signOut, onAuthStateChanged } = firebaseAuth;
 
 const App: React.FC = () => {
   // Auth State
-  // Fix: Use firebaseAuth.User type
-  const [user, setUser] = useState<firebaseAuth.User | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
 
   const [view, setView] = useState<ViewState>('players');
@@ -38,8 +39,8 @@ const App: React.FC = () => {
   const [votingPlayer, setVotingPlayer] = useState<Player | undefined>(undefined);
   const [isFormOpen, setIsFormOpen] = useState(false);
   
-  // Admin State (from DB)
-  const [isAdmin, setIsAdmin] = useState(false);
+  // Admin State
+  const [isAdmin, setIsAdmin] = useState(false); // Default false for production safety
   
   const [playerToDelete, setPlayerToDelete] = useState<string | null>(null);
   const [toast, setToast] = useState<{message: string, type: 'success' | 'info'} | null>(null);
@@ -47,62 +48,72 @@ const App: React.FC = () => {
 
   // 1. Auth Listener
   useEffect(() => {
-    // Fix: Use firebaseAuth.onAuthStateChanged
-    const unsubscribe = firebaseAuth.onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
+      if (!currentUser) {
+          // Reset admin state if logged out
+          setIsAdmin(false); 
+      }
       setAuthLoading(false);
     });
     return () => unsubscribe();
   }, []);
 
-  // 2. Data Listener (Only if logged in)
+  // 2. Data Listener
   useEffect(() => {
+    setLoadingPlayers(true);
+    
+    let unsubUser = () => {};
+
     if (user) {
-        setLoadingPlayers(true);
-        
-        // Listen to User Data (Role & Currency)
-        const unsubUser = subscribeToUserData((data) => {
-            // Check database role directly
+        // Wenn eingeloggt, hole echte Rolle und Bonus
+        unsubUser = subscribeToUserData((data) => {
             setIsAdmin(data.role === 'admin');
         });
 
-        // Real-time subscription to the Global Player Catalog
-        const unsubPlayers = subscribeToPlayers((data) => {
-            setPlayers(data);
-            setLoadingPlayers(false);
-        });
-
-        // Check Daily Bonus
         checkDailyLoginBonus().then(hasBonus => {
             if (hasBonus) setToast({ message: "Täglicher Bonus: +5 Punkte!", type: 'success' });
         });
-
-        return () => {
-            unsubUser();
-            unsubPlayers();
-        };
     } else {
-        setPlayers([]);
-        setIsAdmin(false);
+        // Wenn nicht eingeloggt: Gast-Modus (Lesezugriff)
+        // HINWEIS: Für lokale Entwicklung kannst du hier setIsAdmin(true) setzen, 
+        // aber für die Webseite sollte es false sein.
+        setIsAdmin(false); 
     }
+
+    // Datenbank immer abrufen (Public Read)
+    const unsubPlayers = subscribeToPlayers((data) => {
+        setPlayers(data);
+        setLoadingPlayers(false);
+    });
+
+    return () => {
+        unsubUser();
+        unsubPlayers();
+    };
   }, [user]);
 
   // Auth Functions
   const handleLogin = async () => {
     try {
-        // Fix: Use firebaseAuth.signInWithPopup
-        await firebaseAuth.signInWithPopup(auth, googleProvider);
+        await signInWithPopup(auth, googleProvider);
     } catch (error) {
         console.error("Login failed", error);
-        alert("Login fehlgeschlagen. Prüfe deine Firebase Config.");
+        alert("Login fehlgeschlagen. Bitte prüfe die Konsole oder deine Internetverbindung.");
     }
   };
 
-  // Fix: Use firebaseAuth.signOut
-  const handleLogout = () => firebaseAuth.signOut(auth);
+  const handleLogout = async () => {
+      await signOut(auth);
+      setView('players'); // Reset view on logout
+  };
 
   // CRUD & Interaction
   const handleSavePlayer = async (player: Player) => {
+    if (!user) {
+        alert("Bitte melde dich an, um Änderungen zu speichern.");
+        return;
+    }
     setLoadingPlayers(true); 
     await saveToDatabase(player);
     setIsFormOpen(false);
@@ -113,6 +124,11 @@ const App: React.FC = () => {
 
   const confirmDelete = async () => {
     if (playerToDelete) {
+      if (!user) {
+          alert("Bitte melde dich an, um zu löschen.");
+          setPlayerToDelete(null);
+          return;
+      }
       await deleteFromDatabase(playerToDelete);
       setPlayerToDelete(null);
     }
@@ -123,11 +139,13 @@ const App: React.FC = () => {
   };
 
   const handleCardClick = (player: Player) => {
-    if (!isAdmin) setVotingPlayer(player);
+    // Voting für alle erlauben (auch Gäste können sehen, aber voteForStat in service prüft Auth)
+    setVotingPlayer(player);
   };
 
   const handleRewardPlayer = async (e: React.MouseEvent, player: Player) => {
     e.stopPropagation();
+    if (!user) return;
     await addCurrency(1);
     setToast({ message: `1 Punkt für ${player.name} vergeben!`, type: 'success' });
   };
@@ -157,29 +175,7 @@ const App: React.FC = () => {
     return sorted;
   };
 
-  // --- LOGIN SCREEN ---
-  if (authLoading) return <div className="h-screen bg-slate-950 flex items-center justify-center text-white">Lade...</div>;
-
-  if (!user) {
-      return (
-          <div className="h-screen bg-slate-950 flex flex-col items-center justify-center p-4 relative overflow-hidden">
-              <div className="absolute inset-0 bg-green-500/10 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-green-900/20 via-slate-950 to-slate-950"></div>
-              <div className="z-10 bg-slate-900 p-8 rounded-2xl shadow-2xl border border-slate-700 text-center max-w-md w-full">
-                  <div className="w-16 h-16 bg-gradient-to-tr from-green-500 to-emerald-300 rounded-xl rotate-3 shadow-[0_0_20px_rgba(34,197,94,0.5)] mx-auto mb-6"></div>
-                  <h1 className="text-3xl font-black text-white italic uppercase mb-2">FC<span className="text-green-400">26</span> Manager</h1>
-                  <p className="text-slate-400 mb-8">Baue dein Team, sammle Karten und vote mit deinen Freunden.</p>
-                  
-                  <button 
-                    onClick={handleLogin}
-                    className="w-full py-3 bg-white text-slate-900 font-bold rounded-lg flex items-center justify-center gap-2 hover:bg-slate-200 transition"
-                  >
-                      <LogIn size={20} />
-                      Mit Google anmelden
-                  </button>
-              </div>
-          </div>
-      );
-  }
+  if (authLoading) return <div className="h-screen bg-slate-950 flex items-center justify-center text-white font-sans text-xl animate-pulse">Lade Manager...</div>;
 
   // --- MAIN APP ---
   return (
@@ -207,20 +203,36 @@ const App: React.FC = () => {
         </div>
         
         <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-                <img src={user.photoURL || ''} alt="User" className="w-8 h-8 rounded-full border border-slate-600" />
-                <span className="hidden md:inline text-sm font-bold">{user.displayName}</span>
-            </div>
             
-            {isAdmin && (
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold border bg-green-500/10 border-green-500 text-green-400 cursor-default animate-in fade-in" title="Du bist Admin">
-                    <ShieldCheck size={14}/> ADMIN
+            {/* User Status / Login Button */}
+            {user ? (
+                <div className="flex items-center gap-3">
+                    {isAdmin && (
+                        <div className="hidden md:flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold border bg-green-500/10 border-green-500 text-green-400 uppercase tracking-wider">
+                            <ShieldCheck size={12}/> Admin
+                        </div>
+                    )}
+                    <div className="flex items-center gap-2 bg-slate-800 rounded-full pr-4 pl-1 py-1 border border-slate-700">
+                        <img src={user.photoURL || ''} alt="User" className="w-6 h-6 rounded-full border border-slate-600" />
+                        <span className="hidden md:inline text-xs font-bold text-slate-300">{user.displayName}</span>
+                    </div>
+                    <button onClick={handleLogout} className="p-2 text-slate-500 hover:text-red-400 transition" title="Abmelden">
+                        <LogOut size={20} />
+                    </button>
+                </div>
+            ) : (
+                <div className="flex items-center gap-3">
+                     <span className="hidden md:inline text-xs font-bold text-slate-500 uppercase tracking-wide">Gastzugang</span>
+                    <button 
+                        onClick={handleLogin} 
+                        className="flex items-center gap-2 bg-white text-slate-950 hover:bg-slate-200 px-4 py-2 rounded-full font-bold text-sm transition shadow-[0_0_15px_rgba(255,255,255,0.1)] hover:shadow-[0_0_20px_rgba(255,255,255,0.3)]"
+                        title="Mit Google anmelden"
+                    >
+                        <LogIn size={16} />
+                        <span>Anmelden</span>
+                    </button>
                 </div>
             )}
-            
-            <button onClick={handleLogout} className="p-2 text-slate-500 hover:text-red-400" title="Logout">
-                <LogOut size={20} />
-            </button>
         </div>
       </header>
 
@@ -234,7 +246,7 @@ const App: React.FC = () => {
                   <Globe className="text-slate-500" />
                   <div>
                     <h2 className="text-2xl font-bold text-white">Datenbank</h2>
-                    <p className="text-xs text-slate-400">Live synchronisiert</p>
+                    <p className="text-xs text-slate-400">Alle Spieler im System</p>
                   </div>
               </div>
               
@@ -243,7 +255,7 @@ const App: React.FC = () => {
                  <div className="flex items-center bg-slate-800 rounded-lg p-1 border border-slate-700">
                     <span className="px-2 text-slate-500"><ArrowUpDown size={14}/></span>
                     <select 
-                        className="bg-transparent text-sm text-white focus:outline-none py-1 pr-2"
+                        className="bg-transparent text-sm text-white focus:outline-none py-1 pr-2 cursor-pointer"
                         onChange={(e) => {
                             const [key, dir] = e.target.value.split('-');
                             setSortConfig({ key: key as 'name'|'rating', direction: dir as 'asc'|'desc' });

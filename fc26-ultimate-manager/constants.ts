@@ -5,7 +5,7 @@ import { Formation, Player, Position, PlayerStats, CardType } from './types';
 export const CARD_DESIGNS: Record<CardType, { url: string; textColor: string; borderColor: string; label: string }> = {
   gold: {
     url: 'https://i.imgur.com/JpDFXLj.png',
-    textColor: '#3e2e13',
+    textColor: '#171717', // Geändert zu fast Schwarz (Dark Neutral)
     borderColor: '#e2b748',
     label: 'Standard Gold'
   },
@@ -139,7 +139,6 @@ export const MOCK_PLAYERS: Player[] = [
     nation: '🇧🇷',
     stats: { PAC: 95, SHO: 96, PAS: 93, DRI: 96, DEF: 60, PHY: 76 }
   },
-  // Added more players to reach minimum count for 2 teams
   {
     id: '8',
     name: 'K. Mbappe',
