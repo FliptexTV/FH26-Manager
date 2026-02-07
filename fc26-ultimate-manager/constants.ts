@@ -24,6 +24,7 @@ export const CARD_DESIGNS: Record<CardType, { url: string; textColor: string; bo
 };
 
 export const NATIONS = [
+  // Europe
   { label: 'Deutschland', flag: '🇩🇪' },
   { label: 'Österreich', flag: '🇦🇹' },
   { label: 'Schweiz', flag: '🇨🇭' },
@@ -31,20 +32,54 @@ export const NATIONS = [
   { label: 'England', flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿' },
   { label: 'Spanien', flag: '🇪🇸' },
   { label: 'Italien', flag: '🇮🇹' },
-  { label: 'Brasilien', flag: '🇧🇷' },
-  { label: 'Argentinien', flag: '🇦🇷' },
   { label: 'Niederlande', flag: '🇳🇱' },
   { label: 'Portugal', flag: '🇵🇹' },
   { label: 'Belgien', flag: '🇧🇪' },
+  { label: 'Kroatien', flag: '🇭🇷' },
+  { label: 'Dänemark', flag: '🇩🇰' },
   { label: 'Polen', flag: '🇵🇱' },
   { label: 'Türkei', flag: '🇹🇷' },
-  { label: 'Kroatien', flag: '🇭🇷' },
+  { label: 'Serbien', flag: '🇷🇸' },
+  { label: 'Schottland', flag: '🏴󠁧󠁢󠁳󠁣󠁴󠁿' },
+  { label: 'Ukraine', flag: '🇺🇦' },
+  { label: 'Schweden', flag: '🇸🇪' },
+  { label: 'Norwegen', flag: '🇳🇴' },
+  { label: 'Ungarn', flag: '🇭🇺' },
+  { label: 'Tschechien', flag: '🇨🇿' },
+  
+  // South America
+  { label: 'Brasilien', flag: '🇧🇷' },
+  { label: 'Argentinien', flag: '🇦🇷' },
+  { label: 'Uruguay', flag: '🇺🇾' },
+  { label: 'Kolumbien', flag: '🇨🇴' },
+  { label: 'Chile', flag: '🇨🇱' },
+  { label: 'Ecuador', flag: '🇪🇨' },
+  
+  // North America
   { label: 'USA', flag: '🇺🇸' },
   { label: 'Kanada', flag: '🇨🇦' },
+  { label: 'Mexiko', flag: '🇲🇽' },
+  
+  // Africa
+  { label: 'Marokko', flag: '🇲🇦' },
+  { label: 'Senegal', flag: '🇸🇳' },
+  { label: 'Ägypten', flag: '🇪🇬' },
+  { label: 'Nigeria', flag: '🇳🇬' },
+  { label: 'Elfenbeinküste', flag: '🇨🇮' },
+  { label: 'Kamerun', flag: '🇨🇲' },
+  { label: 'Ghana', flag: '🇬🇭' },
+  { label: 'Algerien', flag: '🇩🇿' },
+
+  // Asia
   { label: 'Japan', flag: '🇯🇵' },
   { label: 'Südkorea', flag: '🇰🇷' },
+  { label: 'Australien', flag: '🇦🇺' },
+  { label: 'Saudi-Arabien', flag: '🇸🇦' },
+  { label: 'Iran', flag: '🇮🇷' },
+  
+  // Rest
   { label: 'Welt', flag: '🌍' }
-];
+].sort((a, b) => a.label.localeCompare(b.label));
 
 // Gewichtung der Stats für realistischere OVR Berechnung
 // Werte basieren auf einer Annäherung an echte Algorithmen (wichtigste Stats zählen mehr)

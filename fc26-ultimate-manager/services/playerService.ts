@@ -285,8 +285,55 @@ export const getMatches = async (): Promise<MatchResult[]> => {
 };
 
 export const saveMatch = async (match: MatchResult) => {
+    // 1. Save the match record itself
     await setDoc(doc(db, MATCHES_COLLECTION, match.id), match);
-    await addCurrency(1); // Reward
+    await addCurrency(1); // Reward for saving
+
+    // 2. Fetch involved teams to identify players
+    try {
+        const homeTeamDoc = await getDoc(doc(db, TEAMS_COLLECTION, match.homeTeamId));
+        const awayTeamDoc = await getDoc(doc(db, TEAMS_COLLECTION, match.awayTeamId));
+
+        if (homeTeamDoc.exists() && awayTeamDoc.exists()) {
+            const homeTeam = homeTeamDoc.data() as Team;
+            const awayTeam = awayTeamDoc.data() as Team;
+
+            const homeWon = match.homeScore > match.awayScore;
+            const awayWon = match.awayScore > match.homeScore;
+
+            // Calculate goals per player from events
+            const playerGoals: Record<string, number> = {};
+            match.events.forEach(ev => {
+                if (ev.type === 'goal') {
+                    playerGoals[ev.playerId] = (playerGoals[ev.playerId] || 0) + 1;
+                }
+            });
+
+            // Update Home Players
+            for (const playerId of homeTeam.playerIds) {
+                if (!playerId) continue;
+                const goals = playerGoals[playerId] || 0;
+                await updateDoc(doc(db, PLAYERS_COLLECTION, playerId), {
+                    "gameStats.played": increment(1),
+                    "gameStats.won": increment(homeWon ? 1 : 0),
+                    "gameStats.goals": increment(goals)
+                });
+            }
+
+            // Update Away Players
+            for (const playerId of awayTeam.playerIds) {
+                if (!playerId) continue;
+                const goals = playerGoals[playerId] || 0;
+                await updateDoc(doc(db, PLAYERS_COLLECTION, playerId), {
+                    "gameStats.played": increment(1),
+                    "gameStats.won": increment(awayWon ? 1 : 0),
+                    "gameStats.goals": increment(goals)
+                });
+            }
+        }
+    } catch (e) {
+        console.error("Error updating player stats after match:", e);
+    }
 };
 
 export const deleteMatch = async (id: string) => {
