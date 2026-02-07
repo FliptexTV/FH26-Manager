@@ -313,22 +313,27 @@ export const saveMatch = async (match: MatchResult) => {
             for (const playerId of homeTeam.playerIds) {
                 if (!playerId) continue;
                 const goals = playerGoals[playerId] || 0;
-                await updateDoc(doc(db, PLAYERS_COLLECTION, playerId), {
-                    "gameStats.played": increment(1),
-                    "gameStats.won": increment(homeWon ? 1 : 0),
-                    "gameStats.goals": increment(goals)
-                });
+                // Use setDoc with merge to ensure gameStats is created if missing
+                await setDoc(doc(db, PLAYERS_COLLECTION, playerId), {
+                    gameStats: {
+                        played: increment(1),
+                        won: increment(homeWon ? 1 : 0),
+                        goals: increment(goals)
+                    }
+                }, { merge: true });
             }
 
             // Update Away Players
             for (const playerId of awayTeam.playerIds) {
                 if (!playerId) continue;
                 const goals = playerGoals[playerId] || 0;
-                await updateDoc(doc(db, PLAYERS_COLLECTION, playerId), {
-                    "gameStats.played": increment(1),
-                    "gameStats.won": increment(awayWon ? 1 : 0),
-                    "gameStats.goals": increment(goals)
-                });
+                await setDoc(doc(db, PLAYERS_COLLECTION, playerId), {
+                    gameStats: {
+                        played: increment(1),
+                        won: increment(awayWon ? 1 : 0),
+                        goals: increment(goals)
+                    }
+                }, { merge: true });
             }
         }
     } catch (e) {

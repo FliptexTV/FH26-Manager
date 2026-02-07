@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { Player, Position, PlayerStats, CardType } from '../types';
+import { Player, Position, PlayerStats, CardType, GameStats } from '../types';
 import { POSITION_WEIGHTS, CARD_DESIGNS, NATIONS } from '../constants';
 import { uploadPlayerImage } from '../services/playerService';
-import { Upload, X, Calculator, Check, Link as LinkIcon, Loader2 } from 'lucide-react';
+import { Upload, X, Calculator, Check, Link as LinkIcon, Loader2, Trophy, BarChart3 } from 'lucide-react';
 
 interface PlayerFormProps {
   initialPlayer?: Player;
@@ -22,7 +22,8 @@ const PlayerForm: React.FC<PlayerFormProps> = ({ initialPlayer, onSave, onCancel
     cardType: 'gold',
     nation: '🇩🇪',
     stats: { PAC: 75, SHO: 75, PAS: 75, DRI: 75, DEF: 50, PHY: 70 },
-    club: ''
+    club: '',
+    gameStats: { played: 0, won: 0, goals: 0, assists: 0, cleanSheets: 0 }
   });
 
   const [autoCalculate, setAutoCalculate] = useState(true);
@@ -62,6 +63,18 @@ const PlayerForm: React.FC<PlayerFormProps> = ({ initialPlayer, onSave, onCancel
     let numVal = parseInt(value);
     if (isNaN(numVal)) numVal = 0; if (numVal > 99) numVal = 99; if (numVal < 1) numVal = 1;
     setFormData(prev => ({ ...prev, stats: { ...prev.stats, [stat]: numVal } }));
+  };
+
+  const handleGameStatChange = (stat: keyof GameStats, value: string) => {
+      let numVal = parseInt(value);
+      if(isNaN(numVal)) numVal = 0;
+      setFormData(prev => ({
+          ...prev,
+          gameStats: {
+              ...(prev.gameStats || { played: 0, won: 0, goals: 0, assists: 0, cleanSheets: 0 }),
+              [stat]: numVal
+          }
+      }));
   };
 
   // ASYNC UPLOAD TO FIREBASE
@@ -166,28 +179,68 @@ const PlayerForm: React.FC<PlayerFormProps> = ({ initialPlayer, onSave, onCancel
 
           </div>
 
-          {/* Right Side: Stats */}
-          <div className="bg-slate-800/30 p-4 rounded-xl border border-slate-700/50">
-            <div className="flex justify-between items-center mb-4">
-                 <h3 className="text-sm font-semibold text-slate-300 uppercase">Attribute</h3>
-                 <div className="flex items-center gap-2 bg-slate-800 px-3 py-1 rounded border border-slate-700">
-                     <span className="text-xs text-slate-400">Rating</span>
-                     <span className="text-xl font-bold text-yellow-400">{formData.rating}</span>
-                 </div>
+          {/* Right Side: Stats & Game Data */}
+          <div className="space-y-4">
+             {/* Attributes Box */}
+            <div className="bg-slate-800/30 p-4 rounded-xl border border-slate-700/50">
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-sm font-semibold text-slate-300 uppercase">Attribute</h3>
+                    <div className="flex items-center gap-2 bg-slate-800 px-3 py-1 rounded border border-slate-700">
+                        <span className="text-xs text-slate-400">Rating</span>
+                        <span className="text-xl font-bold text-yellow-400">{formData.rating}</span>
+                    </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                {isGK ? (
+                    <> {renderStatInput('DIV', 'DIV')} {renderStatInput('REF', 'REF')} {renderStatInput('HAN', 'HAN')} {renderStatInput('SPE', 'SPE')} {renderStatInput('KIC', 'KIC')} {renderStatInput('POS', 'POS')} </>
+                ) : (
+                    <> {renderStatInput('PAC', 'PAC')} {renderStatInput('SHO', 'SHO')} {renderStatInput('PAS', 'PAS')} {renderStatInput('DRI', 'DRI')} {renderStatInput('DEF', 'DEF')} {renderStatInput('PHY', 'PHY')} </>
+                )}
+                </div>
+                
+                <div className="mt-6">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" checked={autoCalculate} onChange={(e) => setAutoCalculate(e.target.checked)} className="rounded bg-slate-700 border-slate-600 text-green-500 focus:ring-green-500" />
+                        <span className="text-xs text-slate-400">Rating automatisch berechnen</span>
+                    </label>
+                </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              {isGK ? (
-                <> {renderStatInput('DIV', 'DIV')} {renderStatInput('REF', 'REF')} {renderStatInput('HAN', 'HAN')} {renderStatInput('SPE', 'SPE')} {renderStatInput('KIC', 'KIC')} {renderStatInput('POS', 'POS')} </>
-              ) : (
-                <> {renderStatInput('PAC', 'PAC')} {renderStatInput('SHO', 'SHO')} {renderStatInput('PAS', 'PAS')} {renderStatInput('DRI', 'DRI')} {renderStatInput('DEF', 'DEF')} {renderStatInput('PHY', 'PHY')} </>
-              )}
-            </div>
-            
-            <div className="mt-6">
-                <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" checked={autoCalculate} onChange={(e) => setAutoCalculate(e.target.checked)} className="rounded bg-slate-700 border-slate-600 text-green-500 focus:ring-green-500" />
-                    <span className="text-xs text-slate-400">Rating automatisch berechnen</span>
-                </label>
+
+            {/* Admin Stats Editing Box */}
+            <div className="bg-blue-900/10 p-4 rounded-xl border border-blue-500/20">
+                <div className="flex items-center gap-2 mb-3 border-b border-blue-500/20 pb-2">
+                    <BarChart3 size={16} className="text-blue-400"/>
+                    <h3 className="text-sm font-semibold text-blue-200 uppercase">Saison Stats (Admin)</h3>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                    <div className="flex flex-col">
+                        <label className="text-[10px] uppercase text-slate-400 mb-1">Spiele</label>
+                        <input 
+                            type="number" 
+                            className="bg-slate-800 border border-slate-700 rounded p-2 text-white text-center focus:border-blue-500 focus:outline-none"
+                            value={formData.gameStats?.played || 0}
+                            onChange={(e) => handleGameStatChange('played', e.target.value)}
+                        />
+                    </div>
+                    <div className="flex flex-col">
+                        <label className="text-[10px] uppercase text-slate-400 mb-1">Tore</label>
+                        <input 
+                            type="number" 
+                            className="bg-slate-800 border border-slate-700 rounded p-2 text-white text-center focus:border-blue-500 focus:outline-none"
+                            value={formData.gameStats?.goals || 0}
+                            onChange={(e) => handleGameStatChange('goals', e.target.value)}
+                        />
+                    </div>
+                    <div className="flex flex-col">
+                        <label className="text-[10px] uppercase text-slate-400 mb-1">Siege</label>
+                        <input 
+                            type="number" 
+                            className="bg-slate-800 border border-slate-700 rounded p-2 text-white text-center focus:border-blue-500 focus:outline-none"
+                            value={formData.gameStats?.won || 0}
+                            onChange={(e) => handleGameStatChange('won', e.target.value)}
+                        />
+                    </div>
+                </div>
             </div>
           </div>
         </div>
