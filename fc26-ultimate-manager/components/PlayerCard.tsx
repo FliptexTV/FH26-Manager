@@ -64,7 +64,7 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
   
   // Adjusted vertical positions
   const textContainerPosition = isSmall ? 'bottom-[16%]' : 'bottom-[10%]';
-  const ratingPosition = isSmall ? 'top-[18%]' : 'top-[18%]';
+  const ratingPosition = isSmall ? 'top-[22%]' : 'top-[22%]';
 
   // --- TILT LOGIC ---
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
