@@ -1,4 +1,5 @@
 
+
 import { 
   collection, 
   doc, 
@@ -412,7 +413,26 @@ export const openPack = async (): Promise<Player | null> => {
     const allPlayers = await getDatabase();
     if (allPlayers.length === 0) return null;
 
-    const template = allPlayers[Math.floor(Math.random() * allPlayers.length)];
+    // --- WEIGHTED RANDOM LOGIC (PROBABILITY) ---
+    // Target: 10% Chance for Walkout (88+), 90% for others.
+    const walkoutThreshold = 88;
+    const highRated = allPlayers.filter(p => p.rating >= walkoutThreshold);
+    const lowRated = allPlayers.filter(p => p.rating < walkoutThreshold);
+
+    const isWalkoutChance = Math.random() < 0.10; // 10%
+
+    let template: Player;
+
+    if (isWalkoutChance && highRated.length > 0) {
+        // Hit the jackpot
+        template = highRated[Math.floor(Math.random() * highRated.length)];
+    } else if (lowRated.length > 0) {
+        // Normal card
+        template = lowRated[Math.floor(Math.random() * lowRated.length)];
+    } else {
+        // Fallback if pools are empty/weird
+        template = allPlayers[Math.floor(Math.random() * allPlayers.length)];
+    }
 
     const newPlayer: Player = {
         ...template,

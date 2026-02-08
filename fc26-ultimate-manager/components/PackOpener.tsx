@@ -39,7 +39,7 @@ const PackOpener: React.FC = () => {
     }
     
     setRevealedPlayer(player);
-    const isWalkout = player.rating >= 86; // Walkout ab 86+
+    const isWalkout = player.rating >= 88; // WALKOUT NUR NOCH AB 88+
 
     // Animation Timeline
     setTimeout(() => setWalkoutStage('flash'), 1200); // 1.2s Shake -> Flash
@@ -50,7 +50,7 @@ const PackOpener: React.FC = () => {
         setTimeout(() => setWalkoutStage('club'), 5000);     // Verein dazu
         setTimeout(() => setWalkoutStage('revealed'), 6500); // BOOM
     } else {
-        // Schneller Reveal für Low-Rated Karten
+        // Schneller Reveal für Karten unter 88
         setTimeout(() => setWalkoutStage('revealed'), 2500);
     }
   };
@@ -88,13 +88,16 @@ const PackOpener: React.FC = () => {
       const showPos = ['position', 'club'].includes(walkoutStage);
       const showClub = ['club'].includes(walkoutStage);
 
+      // Force render if we are in nation stage
+      if (!showNation) return null;
+
       return (
-          <div className="flex flex-col items-center justify-center gap-6 z-20">
+          <div className="flex flex-col items-center justify-center gap-6 z-[60]">
               {/* NATION */}
               <div className={`transition-all duration-500 transform ${showNation ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 -translate-y-20 scale-150'}`}>
                   {showNation && (
                       <div className="flex flex-col items-center animate-slam">
-                          <span className="text-9xl drop-shadow-[0_0_25px_rgba(255,255,255,0.5)]">{revealedPlayer.nation}</span>
+                          <span className="text-9xl drop-shadow-[0_0_25px_rgba(255,255,255,0.8)] text-white">{revealedPlayer.nation}</span>
                       </div>
                   )}
               </div>
@@ -103,7 +106,7 @@ const PackOpener: React.FC = () => {
               <div className={`transition-all duration-500 transform ${showPos ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-20'}`}>
                   {showPos && (
                       <div className="flex flex-col items-center animate-slam-delay">
-                          <span className="text-8xl font-black text-white uppercase tracking-tighter drop-shadow-[0_4px_0_rgba(0,0,0,0.5)] font-mono">
+                          <span className="text-8xl font-black text-white uppercase tracking-tighter drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)] font-mono">
                             {revealedPlayer.position}
                           </span>
                       </div>
@@ -113,8 +116,8 @@ const PackOpener: React.FC = () => {
               {/* CLUB */}
               <div className={`transition-all duration-500 transform ${showClub ? 'opacity-100 scale-100' : 'opacity-0 scale-50'}`}>
                   {showClub && (
-                      <div className="flex flex-col items-center animate-slam-delay-2 bg-white/10 px-8 py-2 rounded-xl backdrop-blur-md border border-white/20">
-                          <span className="text-3xl font-bold text-yellow-400 uppercase tracking-widest drop-shadow-md">
+                      <div className="flex flex-col items-center animate-slam-delay-2 bg-white/10 px-8 py-2 rounded-xl backdrop-blur-md border border-white/20 shadow-xl">
+                          <span className="text-4xl font-bold text-yellow-400 uppercase tracking-widest drop-shadow-md">
                              {revealedPlayer.club || 'Free Agent'}
                           </span>
                       </div>
@@ -192,14 +195,14 @@ const PackOpener: React.FC = () => {
                          <div className="absolute inset-[-50%] w-[200%] h-[200%] bg-[conic-gradient(from_0deg_at_50%_50%,transparent_0deg,rgba(255,215,0,0.1)_20deg,transparent_40deg,rgba(255,215,0,0.1)_60deg,transparent_80deg,rgba(255,215,0,0.1)_100deg,transparent_120deg,rgba(255,215,0,0.1)_140deg,transparent_160deg,rgba(255,215,0,0.1)_180deg,transparent_200deg,rgba(255,215,0,0.1)_220deg,transparent_240deg,rgba(255,215,0,0.1)_260deg,transparent_280deg,rgba(255,215,0,0.1)_300deg,transparent_320deg,rgba(255,215,0,0.1)_340deg,transparent_360deg)] animate-[spin-slow_20s_linear_infinite]"></div>
                      )}
 
-                     {/* Flashbang Effect */}
-                     {walkoutStage === 'flash' && (
-                         <div className="absolute inset-0 bg-white animate-out fade-out duration-1000 z-50 pointer-events-none"></div>
+                     {/* Flashbang Effect - FIXED: Persistent during Flash AND start of Nation to allow smooth fade */}
+                     {(walkoutStage === 'flash' || walkoutStage === 'nation') && (
+                         <div className="absolute inset-0 bg-white animate-out fade-out duration-[1500ms] z-50 pointer-events-none fill-mode-forwards"></div>
                      )}
 
                      {/* Tunnel Spotlights */}
                      {['nation', 'position', 'club'].includes(walkoutStage) && (
-                         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-20 h-[100vh] bg-gradient-to-b from-white/20 to-transparent blur-3xl"></div>
+                         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-20 h-[100vh] bg-gradient-to-b from-white/20 to-transparent blur-3xl z-40"></div>
                      )}
 
                      {/* --- STAGE CONTENT --- */}
