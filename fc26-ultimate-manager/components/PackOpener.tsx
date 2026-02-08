@@ -14,7 +14,10 @@ const PackOpener: React.FC = () => {
   // Pack Opening State
   const [isOpening, setIsOpening] = useState(false);
   const [revealedPlayer, setRevealedPlayer] = useState<Player | null>(null);
-  const [walkoutStage, setWalkoutStage] = useState<'idle' | 'opening' | 'flash' | 'nation' | 'position' | 'club' | 'revealed'>('idle');
+  
+  // Stages: idle -> opening (shake) -> flash (white) -> nation -> position -> revealed
+  const [stage, setStage] = useState<'idle' | 'opening' | 'flash' | 'nation' | 'position' | 'revealed'>('idle');
+  
   const [playerToSell, setPlayerToSell] = useState<string | null>(null);
 
   useEffect(() => {
@@ -27,31 +30,40 @@ const PackOpener: React.FC = () => {
     if (currency < 1 || isOpening) return;
     setIsOpening(true);
     setRevealedPlayer(null);
-    setWalkoutStage('opening'); // Shaking
+    setStage('opening'); // Phase 1: Pack Wackeln
 
-    // Async Open
+    // 1. Backend Call (Punkte abziehen, Spieler generieren)
     const player = await openPack();
     
     if (!player) {
         setIsOpening(false);
-        setWalkoutStage('idle');
+        setStage('idle');
         return;
     }
     
-    setRevealedPlayer(player);
-    const isWalkout = player.rating >= 88; // WALKOUT NUR NOCH AB 88+
+    // Kleiner Delay damit das Wackeln wirkt
+    await new Promise(r => setTimeout(r, 800));
 
-    // Animation Timeline
-    setTimeout(() => setWalkoutStage('flash'), 1200); // 1.2s Shake -> Flash
+    setRevealedPlayer(player);
+    const isWalkout = player.rating >= 88; // NUR 88+ ist ein Walkout
+
+    // Phase 2: Flashbang (Weißer Blitz)
+    setStage('flash');
 
     if (isWalkout) {
-        setTimeout(() => setWalkoutStage('nation'), 2000);   // Flagge
-        setTimeout(() => setWalkoutStage('position'), 3500); // Position dazu
-        setTimeout(() => setWalkoutStage('club'), 5000);     // Verein dazu
-        setTimeout(() => setWalkoutStage('revealed'), 6500); // BOOM
+        // --- WALKOUT SEQUENZ ---
+        // Nach 500ms Flash -> Nation (Dunkler Tunnel)
+        setTimeout(() => setStage('nation'), 500);
+        
+        // Nach weiteren 2s -> Position
+        setTimeout(() => setStage('position'), 2500);
+        
+        // Nach weiteren 2s -> Reveal (Karte)
+        setTimeout(() => setStage('revealed'), 4500);
     } else {
-        // Schneller Reveal für Karten unter 88
-        setTimeout(() => setWalkoutStage('revealed'), 2500);
+        // --- KEIN WALKOUT (Schnell) ---
+        // Nach 800ms Flash -> Direkt Karte anzeigen
+        setTimeout(() => setStage('revealed'), 800);
     }
   };
 
@@ -73,102 +85,49 @@ const PackOpener: React.FC = () => {
 
   const handleReset = () => {
     setRevealedPlayer(null);
-    setWalkoutStage('idle');
+    setStage('idle');
     setIsOpening(false);
   };
 
   // --- RENDER HELPERS ---
-
-  // Rendert die Walkout-Informationen (Nation -> Position -> Club)
-  const renderWalkoutContent = () => {
-      if (!revealedPlayer) return null;
-
-      // Determine visibility based on stage sequence
-      const showNation = ['nation', 'position', 'club'].includes(walkoutStage);
-      const showPos = ['position', 'club'].includes(walkoutStage);
-      const showClub = ['club'].includes(walkoutStage);
-
-      // Force render if we are in nation stage
-      if (!showNation) return null;
-
-      return (
-          <div className="flex flex-col items-center justify-center gap-6 z-[60]">
-              {/* NATION */}
-              <div className={`transition-all duration-500 transform ${showNation ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 -translate-y-20 scale-150'}`}>
-                  {showNation && (
-                      <div className="flex flex-col items-center animate-slam">
-                          <span className="text-9xl drop-shadow-[0_0_25px_rgba(255,255,255,0.8)] text-white">{revealedPlayer.nation}</span>
-                      </div>
-                  )}
-              </div>
-
-              {/* POSITION */}
-              <div className={`transition-all duration-500 transform ${showPos ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-20'}`}>
-                  {showPos && (
-                      <div className="flex flex-col items-center animate-slam-delay">
-                          <span className="text-8xl font-black text-white uppercase tracking-tighter drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)] font-mono">
-                            {revealedPlayer.position}
-                          </span>
-                      </div>
-                  )}
-              </div>
-
-              {/* CLUB */}
-              <div className={`transition-all duration-500 transform ${showClub ? 'opacity-100 scale-100' : 'opacity-0 scale-50'}`}>
-                  {showClub && (
-                      <div className="flex flex-col items-center animate-slam-delay-2 bg-white/10 px-8 py-2 rounded-xl backdrop-blur-md border border-white/20 shadow-xl">
-                          <span className="text-4xl font-bold text-yellow-400 uppercase tracking-widest drop-shadow-md">
-                             {revealedPlayer.club || 'Free Agent'}
-                          </span>
-                      </div>
-                  )}
-              </div>
-          </div>
-      );
-  };
 
   return (
     <div className="flex flex-col items-center h-full min-h-[600px] pb-20 relative overflow-x-hidden">
       
       {/* --- CSS ANIMATIONS --- */}
       <style>{`
-        @keyframes shake-hard {
-          0% { transform: translate(1px, 1px) rotate(0deg); }
-          10% { transform: translate(-3px, -2px) rotate(-1deg); }
-          20% { transform: translate(-3px, 0px) rotate(1deg); }
-          30% { transform: translate(3px, 2px) rotate(0deg); }
-          40% { transform: translate(1px, -1px) rotate(1deg); }
-          50% { transform: translate(-1px, 2px) rotate(-1deg); }
-          60% { transform: translate(-3px, 1px) rotate(0deg); }
-          70% { transform: translate(3px, 1px) rotate(-1deg); }
-          80% { transform: translate(-1px, -1px) rotate(1deg); }
-          90% { transform: translate(1px, 2px) rotate(0deg); }
-          100% { transform: translate(1px, -2px) rotate(-1deg); }
+        @keyframes shake-extreme {
+          0% { transform: translate(0px, 0px) rotate(0deg); }
+          10% { transform: translate(-5px, -5px) rotate(-5deg); }
+          20% { transform: translate(5px, 5px) rotate(5deg); }
+          30% { transform: translate(-5px, 5px) rotate(-5deg); }
+          40% { transform: translate(5px, -5px) rotate(5deg); }
+          50% { transform: translate(-2px, 2px) rotate(0deg) scale(1.1); }
+          100% { transform: translate(0px, 0px) rotate(0deg) scale(1); }
         }
-        @keyframes slam {
-            0% { transform: scale(3); opacity: 0; }
-            50% { transform: scale(0.9); opacity: 1; }
-            75% { transform: scale(1.1); }
+        @keyframes tunnel-pulse {
+            0% { background-size: 100% 100%; opacity: 0.8; }
+            50% { background-size: 150% 150%; opacity: 1; }
+            100% { background-size: 100% 100%; opacity: 0.8; }
+        }
+        @keyframes slam-in {
+            0% { transform: scale(5); opacity: 0; filter: blur(10px); }
+            40% { transform: scale(0.9); opacity: 1; filter: blur(0px); }
+            60% { transform: scale(1.1); }
             100% { transform: scale(1); }
         }
-        @keyframes spin-slow {
+        @keyframes rays-spin {
             from { transform: rotate(0deg); }
             to { transform: rotate(360deg); }
         }
-        @keyframes god-rays {
-            0% { transform: rotate(0deg) scale(1); opacity: 0.5; }
-            50% { transform: rotate(180deg) scale(1.2); opacity: 0.8; }
-            100% { transform: rotate(360deg) scale(1); opacity: 0.5; }
-        }
-        .animate-shake-hard { animation: shake-hard 0.1s infinite; }
-        .animate-slam { animation: slam 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
-        .animate-slam-delay { animation: slam 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; animation-delay: 0.1s; opacity: 0; }
-        .animate-slam-delay-2 { animation: slam 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; animation-delay: 0.2s; opacity: 0; }
+        .animate-shake-extreme { animation: shake-extreme 0.5s infinite; }
+        .animate-tunnel { animation: tunnel-pulse 2s infinite ease-in-out; }
+        .animate-slam { animation: slam-in 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
       `}</style>
 
       {/* --- HEADER --- */}
-      <div className="w-full max-w-4xl flex flex-col items-center mb-8">
-        <div className="bg-slate-900 border border-slate-700 px-6 py-3 rounded-full flex items-center gap-3 shadow-lg mb-6 z-10">
+      <div className="w-full max-w-4xl flex flex-col items-center mb-8 z-10">
+        <div className="bg-slate-900 border border-slate-700 px-6 py-3 rounded-full flex items-center gap-3 shadow-lg mb-6">
             <div className="flex items-center gap-2">
                 <Coins className="text-yellow-400" />
                 <span className="text-2xl font-black text-white">{currency}</span>
@@ -183,49 +142,68 @@ const PackOpener: React.FC = () => {
       {activeTab === 'shop' ? (
         <div className="relative w-full max-w-md flex flex-col items-center justify-center">
             
-            {/* --- WALKOUT OVERLAY --- */}
-            {(walkoutStage !== 'idle' && walkoutStage !== 'opening') && (
+            {/* --- FULLSCREEN ANIMATION OVERLAY --- */}
+            {(stage !== 'idle' && stage !== 'opening') && (
                 <div className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center overflow-hidden">
                      
-                     {/* Background Effects */}
-                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-slate-800 via-black to-black opacity-80"></div>
-                     
-                     {/* God Rays (Show only on Reveal) */}
-                     {walkoutStage === 'revealed' && (
-                         <div className="absolute inset-[-50%] w-[200%] h-[200%] bg-[conic-gradient(from_0deg_at_50%_50%,transparent_0deg,rgba(255,215,0,0.1)_20deg,transparent_40deg,rgba(255,215,0,0.1)_60deg,transparent_80deg,rgba(255,215,0,0.1)_100deg,transparent_120deg,rgba(255,215,0,0.1)_140deg,transparent_160deg,rgba(255,215,0,0.1)_180deg,transparent_200deg,rgba(255,215,0,0.1)_220deg,transparent_240deg,rgba(255,215,0,0.1)_260deg,transparent_280deg,rgba(255,215,0,0.1)_300deg,transparent_320deg,rgba(255,215,0,0.1)_340deg,transparent_360deg)] animate-[spin-slow_20s_linear_infinite]"></div>
+                     {/* 1. FLASHBANG (Nur kurz beim Übergang) */}
+                     <div className={`absolute inset-0 bg-white pointer-events-none transition-opacity duration-700 ease-out z-[110] ${stage === 'flash' ? 'opacity-100' : 'opacity-0'}`}></div>
+
+                     {/* 2. TUNNEL BACKGROUND (Nur bei Walkout Stages) */}
+                     {(stage === 'nation' || stage === 'position') && (
+                         <div className="absolute inset-0 z-[50] bg-[radial-gradient(circle_at_center,_#3b0764_0%,_#000000_70%)] animate-tunnel">
+                             {/* Moving Lights */}
+                             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[2px] h-full bg-blue-500/50 blur-xl animate-pulse"></div>
+                             <div className="absolute top-1/2 left-0 -translate-y-1/2 w-full h-[2px] bg-purple-500/50 blur-xl animate-pulse"></div>
+                         </div>
                      )}
 
-                     {/* Flashbang Effect - FIXED: Persistent during Flash AND start of Nation to allow smooth fade */}
-                     {(walkoutStage === 'flash' || walkoutStage === 'nation') && (
-                         <div className="absolute inset-0 bg-white animate-out fade-out duration-[1500ms] z-50 pointer-events-none fill-mode-forwards"></div>
+                     {/* 3. GOD RAYS (Nur beim Reveal) */}
+                     {stage === 'revealed' && (
+                         <div className="absolute inset-[-50%] w-[200%] h-[200%] bg-[conic-gradient(from_0deg_at_50%_50%,transparent_0deg,rgba(255,215,0,0.15)_20deg,transparent_40deg,rgba(255,215,0,0.15)_60deg,transparent_80deg,rgba(255,215,0,0.15)_100deg,transparent_120deg,rgba(255,215,0,0.15)_140deg,transparent_160deg,rgba(255,215,0,0.15)_180deg,transparent_200deg,rgba(255,215,0,0.15)_220deg,transparent_240deg,rgba(255,215,0,0.15)_260deg,transparent_280deg,rgba(255,215,0,0.15)_300deg,transparent_320deg,rgba(255,215,0,0.15)_340deg,transparent_360deg)] animate-[rays-spin_20s_linear_infinite] z-[40]"></div>
                      )}
 
-                     {/* Tunnel Spotlights */}
-                     {['nation', 'position', 'club'].includes(walkoutStage) && (
-                         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-20 h-[100vh] bg-gradient-to-b from-white/20 to-transparent blur-3xl z-40"></div>
+                     {/* --- CONTENT: NATION --- */}
+                     {stage === 'nation' && revealedPlayer && (
+                        <div className="z-[60] flex flex-col items-center animate-slam">
+                            <span className="text-[12rem] drop-shadow-[0_0_50px_rgba(255,255,255,0.6)] filter brightness-110">
+                                {revealedPlayer.nation}
+                            </span>
+                        </div>
                      )}
 
-                     {/* --- STAGE CONTENT --- */}
-                     {walkoutStage !== 'revealed' ? (
-                         renderWalkoutContent()
-                     ) : (
-                         /* REVEALED CARD */
-                         <div className="flex flex-col items-center animate-in zoom-in-50 duration-500 z-20">
-                            <div className="relative group">
-                                <div className="absolute -inset-1 bg-gradient-to-r from-yellow-400 via-orange-500 to-yellow-400 rounded-[2.5rem] blur opacity-75 group-hover:opacity-100 transition duration-1000 group-hover:duration-200 animate-pulse"></div>
-                                <PlayerCard player={revealedPlayer!} size="lg" disableHover={false} />
+                     {/* --- CONTENT: POSITION --- */}
+                     {stage === 'position' && revealedPlayer && (
+                        <div className="z-[60] flex flex-col items-center animate-slam">
+                            <span className="text-[10rem] font-black text-white font-mono tracking-tighter drop-shadow-[0_0_30px_rgba(255,255,255,0.8)] border-4 border-white px-8 py-2 rounded-xl bg-white/10 backdrop-blur">
+                                {revealedPlayer.position}
+                            </span>
+                        </div>
+                     )}
+
+                     {/* --- CONTENT: REVEALED CARD --- */}
+                     {stage === 'revealed' && revealedPlayer && (
+                         <div className="flex flex-col items-center animate-slam z-[60]">
+                            <div className="relative group scale-125 md:scale-150">
+                                <div className="absolute -inset-4 bg-gradient-to-r from-yellow-500 via-orange-500 to-yellow-500 rounded-[3rem] blur-xl opacity-50 group-hover:opacity-100 transition duration-1000 animate-pulse"></div>
+                                <PlayerCard player={revealedPlayer} size="lg" disableHover={false} />
                             </div>
                             
-                            <h2 className="text-4xl font-black text-white mt-8 uppercase tracking-widest drop-shadow-lg flex items-center gap-3">
-                                <Star className="text-yellow-400 fill-yellow-400" /> Walkout <Star className="text-yellow-400 fill-yellow-400" />
-                            </h2>
+                            {/* Nur anzeigen wenn es wirklich ein Walkout war (88+) */}
+                            {revealedPlayer.rating >= 88 && (
+                                <h2 className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-200 via-yellow-400 to-yellow-200 mt-12 uppercase tracking-[0.2em] drop-shadow-lg flex items-center gap-4 animate-bounce">
+                                    <Star className="fill-yellow-400 text-yellow-600 w-10 h-10" /> 
+                                    Walkout 
+                                    <Star className="fill-yellow-400 text-yellow-600 w-10 h-10" />
+                                </h2>
+                            )}
 
-                            <div className="flex gap-4 mt-8">
-                                <button onClick={handleQuickSell} className="bg-red-950/80 hover:bg-red-900 text-red-200 font-bold py-4 px-8 rounded-xl border border-red-800 transition transform hover:scale-105">
+                            <div className="flex gap-4 mt-12">
+                                <button onClick={handleQuickSell} className="bg-red-950/80 hover:bg-red-900 text-red-200 font-bold py-4 px-8 rounded-xl border border-red-800 transition transform hover:scale-105 shadow-xl">
                                     Verkaufen (0.5 <Coins className="inline w-4 h-4"/>)
                                 </button>
-                                <button onClick={handleReset} className="bg-white text-black hover:bg-slate-200 font-bold py-4 px-10 rounded-xl border-4 border-slate-300 shadow-[0_0_20px_rgba(255,255,255,0.3)] transition transform hover:scale-105">
-                                    In Verein speichern
+                                <button onClick={handleReset} className="bg-white text-black hover:bg-slate-200 font-bold py-4 px-12 rounded-xl border-4 border-slate-300 shadow-[0_0_30px_rgba(255,255,255,0.4)] transition transform hover:scale-105">
+                                    Behalten
                                 </button>
                             </div>
                         </div>
@@ -234,25 +212,30 @@ const PackOpener: React.FC = () => {
             )}
 
             {/* --- IDLE PACK STATE --- */}
-            <div className="flex flex-col items-center z-10">
+            <div className="flex flex-col items-center z-10 mt-10">
                 <div 
                     onClick={currency >= 1 ? handleOpenPack : undefined} 
                     className={`
-                        relative w-64 h-80 bg-gradient-to-br from-yellow-600 to-yellow-800 rounded-xl 
-                        shadow-[0_20px_50px_rgba(0,0,0,0.5)] border-y-4 border-yellow-400/50 
+                        relative w-72 h-96 bg-gradient-to-br from-yellow-700 via-yellow-600 to-yellow-800 rounded-2xl 
+                        shadow-[0_30px_60px_rgba(0,0,0,0.6)] border-y-8 border-yellow-400/30 
                         flex flex-col items-center justify-center cursor-pointer transition-all 
-                        ${walkoutStage === 'opening' ? 'animate-shake-hard scale-110' : 'hover:scale-105 hover:-translate-y-2'}
+                        ${stage === 'opening' ? 'animate-shake-extreme scale-110 shadow-yellow-500/50' : 'hover:scale-105 hover:-translate-y-2'}
                     `}
                 >
-                    {/* Pack Design */}
-                    <div className="absolute inset-2 border border-yellow-500/30 rounded-lg"></div>
-                    <Package size={80} className={`text-yellow-200 mb-4 drop-shadow-lg ${walkoutStage === 'opening' ? 'animate-pulse' : ''}`} />
-                    <h3 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-b from-yellow-100 to-yellow-400 uppercase tracking-widest">Ultimate</h3>
-                    <span className="text-yellow-200/80 font-mono text-xs mt-1">Pack</span>
+                    {/* Pack Details */}
+                    <div className="absolute inset-3 border-2 border-dashed border-yellow-300/30 rounded-xl"></div>
+                    <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-30 mix-blend-overlay"></div>
                     
-                    {walkoutStage === 'opening' && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-white/20 backdrop-blur-[2px] rounded-lg">
-                            <Zap className="text-white animate-ping" size={64} />
+                    <Package size={100} className={`text-yellow-100 mb-6 drop-shadow-2xl ${stage === 'opening' ? 'text-white' : ''}`} />
+                    
+                    <h3 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-yellow-300 uppercase tracking-widest drop-shadow-sm">Ultimate</h3>
+                    <div className="bg-black/40 px-4 py-1 rounded mt-2 border border-white/10">
+                        <span className="text-yellow-200 font-mono text-sm tracking-widest">PACK</span>
+                    </div>
+                    
+                    {stage === 'opening' && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-white/30 backdrop-blur-[2px] rounded-2xl">
+                            <Zap className="text-white w-32 h-32 animate-ping" />
                         </div>
                     )}
                 </div>
@@ -260,9 +243,9 @@ const PackOpener: React.FC = () => {
                 <button 
                     disabled={currency < 1 || isOpening} 
                     onClick={handleOpenPack} 
-                    className={`mt-10 w-full py-4 rounded-xl font-bold text-xl flex items-center justify-center gap-3 transition-all transform active:scale-95 shadow-lg ${currency >= 1 ? 'bg-green-600 hover:bg-green-500 text-white shadow-green-900/20' : 'bg-slate-800 text-slate-500 cursor-not-allowed'}`}
+                    className={`mt-12 w-full py-5 rounded-2xl font-black text-2xl flex items-center justify-center gap-3 transition-all transform active:scale-95 shadow-xl border-t border-white/20 ${currency >= 1 ? 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white shadow-green-900/50' : 'bg-slate-800 text-slate-500 cursor-not-allowed border-none'}`}
                 >
-                    {isOpening ? 'Öffnet...' : <><span>Pack öffnen (1 Punkt)</span><Coins size={20}/></>}
+                    {isOpening ? 'Opening...' : <><span>Pack öffnen</span><div className="bg-black/20 px-3 py-1 rounded text-sm flex items-center gap-1 font-mono">1 <Coins size={14}/></div></>}
                 </button>
             </div>
         </div>
