@@ -30,7 +30,7 @@ const VotingModal: React.FC<VotingModalProps> = ({ player, onClose, onUpdate }) 
     }
   };
   
-  const marketValue = (player.rating * 1.5).toFixed(1);
+  const marketValue = (13 + (player.rating - 80)*3.3).toFixed(1);
   const totalVotes = Object.values(player.votes || {}).reduce((acc: number, curr: any) => acc + (curr.score || 0), 0) as number;
   
   // Stats safe access
