@@ -4,13 +4,16 @@ import { Player } from '../types';
 import { openPack, addCurrency, deleteFromInventory, subscribeToCurrency, subscribeToInventory } from '../services/playerService';
 import PlayerCard from './PlayerCard';
 import ConfirmationModal from './ConfirmationModal';
-import { Package, Sparkles, Coins, Zap, Star, Trash2 } from 'lucide-react';
+import { Package, Sparkles, Coins, Zap, Star, Trash2, ArrowUpDown } from 'lucide-react';
 
 const PackOpener: React.FC = () => {
   const [currency, setCurrency] = useState(0);
   const [activeTab, setActiveTab] = useState<'shop' | 'inventory'>('shop');
   const [inventory, setInventory] = useState<Player[]>([]);
   
+  // Sorting State
+  const [sortConfig, setSortConfig] = useState<{ key: 'rating' | 'name', direction: 'asc' | 'desc' }>({ key: 'rating', direction: 'desc' });
+
   // Pack Opening State
   const [isOpening, setIsOpening] = useState(false);
   const [revealedPlayer, setRevealedPlayer] = useState<Player | null>(null);
@@ -89,7 +92,57 @@ const PackOpener: React.FC = () => {
     setIsOpening(false);
   };
 
+  const getSortedInventory = () => {
+    return [...inventory].sort((a, b) => {
+        if (sortConfig.key === 'name') {
+            return sortConfig.direction === 'asc' 
+                ? a.name.localeCompare(b.name) 
+                : b.name.localeCompare(a.name);
+        } else {
+            return sortConfig.direction === 'asc' 
+                ? a.rating - b.rating 
+                : b.rating - a.rating;
+        }
+    });
+  };
+
   // --- RENDER HELPERS ---
+
+  // Rendert die Walkout-Informationen (Nation -> Position -> Club)
+  const renderWalkoutContent = () => {
+      if (!revealedPlayer) return null;
+
+      // Determine visibility based on stage sequence
+      const showNation = ['nation', 'position', 'club'].includes(stage);
+      const showPos = ['position', 'club'].includes(stage);
+      
+      // Force render if we are in nation stage
+      if (!showNation) return null;
+
+      return (
+          <div className="flex flex-col items-center justify-center gap-6 z-[60]">
+              {/* NATION */}
+              <div className={`transition-all duration-500 transform ${showNation ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 -translate-y-20 scale-150'}`}>
+                  {showNation && (
+                      <div className="flex flex-col items-center animate-slam">
+                          <span className="text-[12rem] drop-shadow-[0_0_50px_rgba(255,255,255,0.8)] text-white">{revealedPlayer.nation}</span>
+                      </div>
+                  )}
+              </div>
+
+              {/* POSITION */}
+              <div className={`transition-all duration-500 transform ${showPos ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-20'}`}>
+                  {showPos && (
+                      <div className="flex flex-col items-center animate-slam-delay">
+                          <span className="text-8xl font-black text-white uppercase tracking-tighter drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)] font-mono">
+                            {revealedPlayer.position}
+                          </span>
+                      </div>
+                  )}
+              </div>
+          </div>
+      );
+  };
 
   return (
     <div className="flex flex-col items-center h-full min-h-[600px] pb-20 relative overflow-x-hidden">
@@ -252,9 +305,31 @@ const PackOpener: React.FC = () => {
       ) : (
           /* INVENTORY LIST */
           <div className="w-full max-w-5xl">
+              
+              {/* Filter Bar */}
+              <div className="flex justify-between items-center w-full mb-4 px-2">
+                 <div className="text-slate-400 text-sm">{inventory.length} Spieler</div>
+                 <div className="flex items-center bg-slate-800 rounded-lg p-1 border border-slate-700">
+                    <span className="px-2 text-slate-500"><ArrowUpDown size={14}/></span>
+                    <select 
+                        className="bg-transparent text-sm text-white focus:outline-none py-1 pr-2 cursor-pointer"
+                        onChange={(e) => {
+                            const [key, dir] = e.target.value.split('-');
+                            setSortConfig({ key: key as 'name'|'rating', direction: dir as 'asc'|'desc' });
+                        }}
+                        value={`${sortConfig.key}-${sortConfig.direction}`}
+                    >
+                        <option value="rating-desc" className="bg-slate-800">Rating (High)</option>
+                        <option value="rating-asc" className="bg-slate-800">Rating (Low)</option>
+                        <option value="name-asc" className="bg-slate-800">Name (A-Z)</option>
+                        <option value="name-desc" className="bg-slate-800">Name (Z-A)</option>
+                    </select>
+                </div>
+              </div>
+
               {inventory.length > 0 ? (
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 justify-items-center perspective-[1000px]">
-                      {[...inventory].reverse().map(player => (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 justify-items-center perspective-[1000px]">
+                      {getSortedInventory().map(player => (
                           <div key={player.id} className="relative group">
                               <PlayerCard player={player} />
                               <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all duration-300 z-20 translate-y-2 group-hover:translate-y-0">

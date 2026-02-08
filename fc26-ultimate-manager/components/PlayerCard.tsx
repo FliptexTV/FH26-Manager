@@ -32,11 +32,11 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
   const isGK = player.position === Position.GK;
   const design = CARD_DESIGNS[player.cardType] || CARD_DESIGNS.gold;
   
-  // Scaling classes
+  // Scaling classes - UPDATED FOR TALLER RATIO
   const sizeClasses = {
-    sm: "w-32 h-[148px] text-[0.5rem]", 
-    md: "w-60 h-[296px] text-xs",      
-    lg: "w-80 h-[395px] text-sm"       
+    sm: "w-32 h-[180px] text-[0.5rem]",  // Taller (was 148px)
+    md: "w-60 h-[340px] text-xs",       // Taller (was 296px)
+    lg: "w-80 h-[450px] text-sm"        // Taller (was 395px)
   };
   
   // Helper for stat names map
@@ -63,8 +63,8 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
   const isSmall = size === 'sm';
   
   // Adjusted vertical positions
-  const textContainerPosition = isSmall ? 'bottom-[16%]' : 'bottom-[8%]';
-  const ratingPosition = isSmall ? 'top-[18%]' : 'top-[20%]';
+  const textContainerPosition = isSmall ? 'bottom-[16%]' : 'bottom-[10%]';
+  const ratingPosition = isSmall ? 'top-[18%]' : 'top-[18%]';
 
   // --- TILT LOGIC ---
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -139,11 +139,10 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
         <div className={`absolute ${ratingPosition} left-[8%] w-[20%] flex flex-col items-center leading-none text-center`}>
             <span className={`font-bold block ${size === 'lg' ? 'text-5xl' : size === 'md' ? 'text-3xl' : 'text-xl'}`}>{player.rating}</span>
             <span className={`font-medium uppercase block ${size === 'lg' ? 'text-xl mt-1' : size === 'md' ? 'text-sm' : 'text-[0.6rem]'}`}>{player.position}</span>
-            {/* Nation removed from here */}
         </div>
 
         {/* Player Image */}
-        <div className="absolute bottom-[31%] left-1/2 -translate-x-1/2 w-[70%] h-[50%] z-0 flex items-end justify-center">
+        <div className="absolute bottom-[28%] left-1/2 -translate-x-1/2 w-[70%] h-[50%] z-0 flex items-end justify-center">
             <img 
             src={player.image} 
             alt={player.name} 
