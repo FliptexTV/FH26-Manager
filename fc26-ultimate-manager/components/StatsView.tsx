@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { Player, PotmHistory, PotmState } from '../types';
-import { UserData, subscribeToPotmState, subscribeToPotmHistory, startPotmVoting, castPotmVote, endPotmVoting, getUserId } from '../services/playerService';
+import { UserData, subscribeToPotmState, subscribeToPotmHistory, startPotmVoting, castPotmVote, endPotmVoting, getUserId, getAllUsers } from '../services/playerService';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
-import { Club, Crown, Play, Square, Calendar, Vote, AlertTriangle, Lock } from 'lucide-react';
+import { Club, Crown, Play, Square, Calendar, Vote, AlertTriangle, Lock, Eye, EyeOff, List } from 'lucide-react';
 import PlayerCard from './PlayerCard';
 
 interface StatsViewProps {
@@ -17,6 +17,9 @@ const StatsView: React.FC<StatsViewProps> = ({ players, userData }) => {
   
   // Admin Controls
   const [matchDateInput, setMatchDateInput] = useState(new Date().toISOString().split('T')[0]);
+  const [adminUserList, setAdminUserList] = useState<UserData[]>([]);
+  const [showVoteDetails, setShowVoteDetails] = useState(false);
+
   const isAdmin = userData?.role === 'admin';
   const hasPlayerCard = !!userData?.linkedPlayerId;
   const currentUserId = getUserId();
@@ -26,6 +29,13 @@ const StatsView: React.FC<StatsViewProps> = ({ players, userData }) => {
       const unsubHistory = subscribeToPotmHistory(setPotmHistory);
       return () => { unsubState(); unsubHistory(); };
   }, []);
+
+  // Fetch all users for name resolution if admin
+  useEffect(() => {
+      if (isAdmin) {
+          getAllUsers().then(setAdminUserList);
+      }
+  }, [isAdmin]);
 
   // Helpers
   const handleStartVoting = async () => {
@@ -54,6 +64,17 @@ const StatsView: React.FC<StatsViewProps> = ({ players, userData }) => {
       if (!winnerId && players.length > 0) winnerId = players[0].id;
       
       await endPotmVoting(winnerId, maxVotes > 0 ? maxVotes : 0, activePotm.matchDate);
+  };
+
+  const getVoterNamesForPlayer = (playerId: string) => {
+      const voterIds = Object.entries(activePotm.votes)
+          .filter(([uid, pid]) => pid === playerId)
+          .map(([uid]) => uid);
+      
+      return voterIds.map(uid => {
+          const user = adminUserList.find(u => u.id === uid);
+          return user ? (user.username || 'Unbenannt') : 'Unbekannt';
+      });
   };
 
   // --- STATS CALCULATION ---
@@ -166,6 +187,43 @@ const StatsView: React.FC<StatsViewProps> = ({ players, userData }) => {
                                  {currentVoteData.length === 0 && <span className="text-indigo-400/50 text-xs italic">Noch keine Stimmen...</span>}
                              </div>
                          </div>
+                         
+                         {/* ADMIN DETAILS TOGGLE */}
+                         {isAdmin && activePotm.isActive && (
+                            <div className="bg-slate-950/50 border border-slate-700 rounded-lg p-3 mt-4">
+                                <button 
+                                    onClick={() => setShowVoteDetails(!showVoteDetails)} 
+                                    className="flex items-center gap-2 text-xs text-slate-400 hover:text-white uppercase font-bold w-full"
+                                >
+                                    {showVoteDetails ? <EyeOff size={14}/> : <Eye size={14}/>} 
+                                    {showVoteDetails ? 'Details ausblenden' : 'Details / Log anzeigen'}
+                                </button>
+                                
+                                {showVoteDetails && (
+                                    <div className="mt-3 space-y-3 max-h-40 overflow-y-auto pr-2">
+                                        {currentVoteData.length === 0 && <span className="text-xs text-slate-600">Keine Daten.</span>}
+                                        {currentVoteData.map((d: any) => {
+                                            const voters = getVoterNamesForPlayer(d.id);
+                                            return (
+                                                <div key={d.id} className="text-xs border-b border-slate-800 pb-2 last:border-0">
+                                                    <div className="flex justify-between text-indigo-300 font-bold mb-1">
+                                                        <span>{d.name}</span>
+                                                        <span>{d.votes} Stimmen</span>
+                                                    </div>
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {voters.map((voter, i) => (
+                                                            <span key={i} className="bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded text-[10px]">
+                                                                {voter}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                         )}
 
                          {/* Admin End Button */}
                          {isAdmin && (

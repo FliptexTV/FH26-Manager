@@ -1,8 +1,8 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Player, Position } from '../types';
-import { voteForStat, getUserId, UserData } from '../services/playerService';
-import { X, Trophy, Activity, ThumbsUp, ThumbsDown, Coins, TrendingUp, Club, Calendar, Crosshair, Lock } from 'lucide-react';
+import { voteForStat, getUserId, UserData, getAllUsers } from '../services/playerService';
+import { X, Trophy, Activity, ThumbsUp, ThumbsDown, Coins, TrendingUp, Club, Calendar, Crosshair, Lock, Eye, EyeOff, User } from 'lucide-react';
 import PlayerCard from './PlayerCard';
 
 interface VotingModalProps {
@@ -15,9 +15,20 @@ interface VotingModalProps {
 const VotingModal: React.FC<VotingModalProps> = ({ player, userData, onClose, onUpdate }) => {
   const currentUserId = getUserId();
   const isGK = player.position === Position.GK;
+  const isAdmin = userData?.role === 'admin';
   
+  // Admin State
+  const [adminUserList, setAdminUserList] = useState<UserData[]>([]);
+  const [showAdminDetails, setShowAdminDetails] = useState(false);
+
   // Check if user is allowed to vote (must have a linked player ID)
   const canVote = !!userData?.linkedPlayerId;
+
+  useEffect(() => {
+    if (isAdmin) {
+      getAllUsers().then(setAdminUserList);
+    }
+  }, [isAdmin]);
 
   const statKeys = isGK 
     ? ['DIV', 'HAN', 'KIC', 'REF', 'SPE', 'POS']
@@ -43,6 +54,17 @@ const VotingModal: React.FC<VotingModalProps> = ({ player, userData, onClose, on
   const goals = player.gameStats?.goals || 0;
   const won = player.gameStats?.won || 0;
   const winRate = played > 0 ? Math.round((won / played) * 100) : 0;
+
+  // Helper to get voter names
+  const getVotersForStat = (userVotes: Record<string, 'up' | 'down'>) => {
+      return Object.entries(userVotes).map(([uid, direction]) => {
+          const user = adminUserList.find(u => u.id === uid);
+          return {
+              name: user?.username || 'Unbekannt',
+              direction: direction
+          };
+      });
+  };
 
   return (
     <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-0 md:p-4 backdrop-blur-sm animate-in fade-in duration-200">
@@ -114,11 +136,22 @@ const VotingModal: React.FC<VotingModalProps> = ({ player, userData, onClose, on
                             <p className="text-sm text-slate-400">Bewerte die Attribute des Spielers</p>
                         </div>
                     </div>
-                    {!canVote && (
-                        <div className="bg-red-900/20 border border-red-500/30 px-3 py-1.5 rounded flex items-center gap-2 text-xs text-red-300 font-bold">
-                            <Lock size={12}/> VOTE GESPERRT
-                        </div>
-                    )}
+                    <div className="flex items-center gap-2">
+                        {isAdmin && (
+                            <button 
+                                onClick={() => setShowAdminDetails(!showAdminDetails)} 
+                                className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs px-3 py-1.5 rounded text-slate-300 transition"
+                            >
+                                {showAdminDetails ? <EyeOff size={14}/> : <Eye size={14}/>}
+                                <span className="hidden sm:inline">{showAdminDetails ? 'Details verbergen' : 'Admin Details'}</span>
+                            </button>
+                        )}
+                        {!canVote && (
+                            <div className="bg-red-900/20 border border-red-500/30 px-3 py-1.5 rounded flex items-center gap-2 text-xs text-red-300 font-bold">
+                                <Lock size={12}/> VOTE GESPERRT
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {!canVote && (
@@ -134,43 +167,62 @@ const VotingModal: React.FC<VotingModalProps> = ({ player, userData, onClose, on
                         const userVote = voteData.userVotes[currentUserId];
                         const netScore = voteData.score;
                         const baseValue = player.stats[key as keyof typeof player.stats] || 0;
+                        const voters = isAdmin && showAdminDetails ? getVotersForStat(voteData.userVotes) : [];
 
                         return (
-                        <div key={key} className={`bg-slate-800/50 rounded-lg p-3 border ${canVote ? 'border-slate-700 hover:border-slate-600' : 'border-slate-800 opacity-60'} flex items-center justify-between group transition`}>
-                            <div className="flex items-center gap-3">
-                            <div className="flex flex-col items-center">
-                                <div className={`w-10 h-10 rounded flex items-center justify-center font-bold text-slate-900 mb-1 ${netScore > 0 ? 'bg-green-400' : netScore < 0 ? 'bg-red-400' : 'bg-slate-300'}`}>
-                                    <span className="text-lg leading-none">{baseValue}</span>
+                        <div key={key} className={`bg-slate-800/50 rounded-lg p-3 border ${canVote ? 'border-slate-700 hover:border-slate-600' : 'border-slate-800 opacity-60'} flex flex-col group transition`}>
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="flex flex-col items-center">
+                                        <div className={`w-10 h-10 rounded flex items-center justify-center font-bold text-slate-900 mb-1 ${netScore > 0 ? 'bg-green-400' : netScore < 0 ? 'bg-red-400' : 'bg-slate-300'}`}>
+                                            <span className="text-lg leading-none">{baseValue}</span>
+                                        </div>
+                                        <span className="text-[0.6rem] uppercase opacity-70 font-bold">{key}</span>
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <span className="block font-medium text-slate-200">{statLabels[key]}</span>
+                                        <div className="flex items-center gap-1">
+                                            <span className="text-xs text-slate-500 uppercase">Score:</span>
+                                            <span className={`text-sm font-black ${netScore > 0 ? 'text-green-400' : netScore < 0 ? 'text-red-400' : 'text-slate-400'}`}>
+                                                {netScore > 0 ? '+' : ''}{netScore}
+                                            </span>
+                                        </div>
+                                    </div>
                                 </div>
-                                <span className="text-[0.6rem] uppercase opacity-70 font-bold">{key}</span>
-                            </div>
-                            <div className="flex flex-col">
-                                <span className="block font-medium text-slate-200">{statLabels[key]}</span>
-                                <div className="flex items-center gap-1">
-                                    <span className="text-xs text-slate-500 uppercase">Score:</span>
-                                    <span className={`text-sm font-black ${netScore > 0 ? 'text-green-400' : netScore < 0 ? 'text-red-400' : 'text-slate-400'}`}>
-                                        {netScore > 0 ? '+' : ''}{netScore}
-                                    </span>
-                                </div>
-                            </div>
-                            </div>
 
-                            <div className="flex flex-col gap-1">
-                            <button 
-                                onClick={() => handleVote(key, 'up')}
-                                disabled={!canVote}
-                                className={`p-1.5 rounded transition flex items-center gap-1 ${userVote === 'up' ? 'text-green-400 bg-green-400/10' : canVote ? 'text-slate-500 hover:bg-slate-700' : 'text-slate-700 cursor-not-allowed'}`}
-                            >
-                                <ThumbsUp size={16} />
-                            </button>
-                            <button 
-                                onClick={() => handleVote(key, 'down')}
-                                disabled={!canVote}
-                                className={`p-1.5 rounded transition flex items-center gap-1 ${userVote === 'down' ? 'text-red-400 bg-red-400/10' : canVote ? 'text-slate-500 hover:bg-slate-700' : 'text-slate-700 cursor-not-allowed'}`}
-                            >
-                                <ThumbsDown size={16} />
-                            </button>
+                                <div className="flex flex-col gap-1">
+                                    <button 
+                                        onClick={() => handleVote(key, 'up')}
+                                        disabled={!canVote}
+                                        className={`p-1.5 rounded transition flex items-center gap-1 ${userVote === 'up' ? 'text-green-400 bg-green-400/10' : canVote ? 'text-slate-500 hover:bg-slate-700' : 'text-slate-700 cursor-not-allowed'}`}
+                                    >
+                                        <ThumbsUp size={16} />
+                                    </button>
+                                    <button 
+                                        onClick={() => handleVote(key, 'down')}
+                                        disabled={!canVote}
+                                        className={`p-1.5 rounded transition flex items-center gap-1 ${userVote === 'down' ? 'text-red-400 bg-red-400/10' : canVote ? 'text-slate-500 hover:bg-slate-700' : 'text-slate-700 cursor-not-allowed'}`}
+                                    >
+                                        <ThumbsDown size={16} />
+                                    </button>
+                                </div>
                             </div>
+                            
+                            {/* ADMIN VOTER LIST */}
+                            {isAdmin && showAdminDetails && voters.length > 0 && (
+                                <div className="mt-3 pt-2 border-t border-slate-700/50">
+                                    <div className="text-[10px] text-slate-500 uppercase font-bold mb-1">Votes:</div>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {voters.map((v, i) => (
+                                            <div key={i} className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] border ${v.direction === 'up' ? 'bg-green-900/20 border-green-900/50 text-green-300' : 'bg-red-900/20 border-red-900/50 text-red-300'}`}>
+                                                <User size={10} />
+                                                <span className="truncate max-w-[80px]">{v.name}</span>
+                                                <span>{v.direction === 'up' ? '▲' : '▼'}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                         );
                     })}
