@@ -105,4 +105,4 @@ export interface MatchResult {
   events: MatchEvent[];
 }
 
-export type ViewState = 'players' | 'team' | 'matches' | 'stats' | 'packs' | 'minigames';
+export type ViewState = 'players' | 'team' | 'matches' | 'stats' | 'packs';
