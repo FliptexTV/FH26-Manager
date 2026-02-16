@@ -1,20 +1,24 @@
 
 import React, { useState } from 'react';
 import { Player, Position } from '../types';
-import { voteForStat, getUserId } from '../services/playerService';
-import { X, Trophy, Activity, ThumbsUp, ThumbsDown, Coins, TrendingUp, Club, Calendar, Crosshair } from 'lucide-react';
+import { voteForStat, getUserId, UserData } from '../services/playerService';
+import { X, Trophy, Activity, ThumbsUp, ThumbsDown, Coins, TrendingUp, Club, Calendar, Crosshair, Lock } from 'lucide-react';
 import PlayerCard from './PlayerCard';
 
 interface VotingModalProps {
   player: Player;
+  userData: UserData | null;
   onClose: () => void;
   onUpdate: (updatedPlayer: Player) => void;
 }
 
-const VotingModal: React.FC<VotingModalProps> = ({ player, onClose, onUpdate }) => {
+const VotingModal: React.FC<VotingModalProps> = ({ player, userData, onClose, onUpdate }) => {
   const currentUserId = getUserId();
   const isGK = player.position === Position.GK;
   
+  // Check if user is allowed to vote (must have a linked player ID)
+  const canVote = !!userData?.linkedPlayerId;
+
   const statKeys = isGK 
     ? ['DIV', 'HAN', 'KIC', 'REF', 'SPE', 'POS']
     : ['PAC', 'SHO', 'PAS', 'DRI', 'DEF', 'PHY'];
@@ -24,6 +28,7 @@ const VotingModal: React.FC<VotingModalProps> = ({ player, onClose, onUpdate }) 
     : { PAC: 'Tempo', SHO: 'Schießen', PAS: 'Passen', DRI: 'Dribbling', DEF: 'Defensive', PHY: 'Physis' };
 
   const handleVote = async (statKey: string, direction: 'up' | 'down') => {
+    if (!canVote) return;
     const updatedPlayer = await voteForStat(player.id, statKey, direction);
     if (updatedPlayer) {
       onUpdate(updatedPlayer);
@@ -101,13 +106,27 @@ const VotingModal: React.FC<VotingModalProps> = ({ player, onClose, onUpdate }) 
 
             {/* Right Side: Voting */}
             <div className="w-full md:w-2/3 p-6 md:p-8 bg-slate-900 md:overflow-y-auto">
-                <div className="flex items-center gap-3 mb-6 border-b border-slate-800 pb-4">
-                    <Activity className="text-green-400" />
-                    <div>
-                    <h3 className="text-xl font-bold text-white">Scouting Report</h3>
-                    <p className="text-sm text-slate-400">Bewerte die Attribute des Spielers</p>
+                <div className="flex items-center justify-between mb-6 border-b border-slate-800 pb-4">
+                    <div className="flex items-center gap-3">
+                        <Activity className="text-green-400" />
+                        <div>
+                            <h3 className="text-xl font-bold text-white">Scouting Report</h3>
+                            <p className="text-sm text-slate-400">Bewerte die Attribute des Spielers</p>
+                        </div>
                     </div>
+                    {!canVote && (
+                        <div className="bg-red-900/20 border border-red-500/30 px-3 py-1.5 rounded flex items-center gap-2 text-xs text-red-300 font-bold">
+                            <Lock size={12}/> VOTE GESPERRT
+                        </div>
+                    )}
                 </div>
+
+                {!canVote && (
+                    <div className="mb-4 bg-slate-800/50 p-3 rounded border border-slate-700 text-xs text-slate-400 text-center">
+                        Du benötigst eine zugewiesene <strong>Spielerkarte</strong>, um an Abstimmungen teilzunehmen.<br/>
+                        Bitte kontaktiere einen Admin.
+                    </div>
+                )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {statKeys.map(key => {
@@ -117,7 +136,7 @@ const VotingModal: React.FC<VotingModalProps> = ({ player, onClose, onUpdate }) 
                         const baseValue = player.stats[key as keyof typeof player.stats] || 0;
 
                         return (
-                        <div key={key} className="bg-slate-800/50 rounded-lg p-3 border border-slate-700 flex items-center justify-between group hover:border-slate-600 transition">
+                        <div key={key} className={`bg-slate-800/50 rounded-lg p-3 border ${canVote ? 'border-slate-700 hover:border-slate-600' : 'border-slate-800 opacity-60'} flex items-center justify-between group transition`}>
                             <div className="flex items-center gap-3">
                             <div className="flex flex-col items-center">
                                 <div className={`w-10 h-10 rounded flex items-center justify-center font-bold text-slate-900 mb-1 ${netScore > 0 ? 'bg-green-400' : netScore < 0 ? 'bg-red-400' : 'bg-slate-300'}`}>
@@ -139,13 +158,15 @@ const VotingModal: React.FC<VotingModalProps> = ({ player, onClose, onUpdate }) 
                             <div className="flex flex-col gap-1">
                             <button 
                                 onClick={() => handleVote(key, 'up')}
-                                className={`p-1.5 rounded hover:bg-slate-700 transition flex items-center gap-1 ${userVote === 'up' ? 'text-green-400 bg-green-400/10' : 'text-slate-500'}`}
+                                disabled={!canVote}
+                                className={`p-1.5 rounded transition flex items-center gap-1 ${userVote === 'up' ? 'text-green-400 bg-green-400/10' : canVote ? 'text-slate-500 hover:bg-slate-700' : 'text-slate-700 cursor-not-allowed'}`}
                             >
                                 <ThumbsUp size={16} />
                             </button>
                             <button 
                                 onClick={() => handleVote(key, 'down')}
-                                className={`p-1.5 rounded hover:bg-slate-700 transition flex items-center gap-1 ${userVote === 'down' ? 'text-red-400 bg-red-400/10' : 'text-slate-500'}`}
+                                disabled={!canVote}
+                                className={`p-1.5 rounded transition flex items-center gap-1 ${userVote === 'down' ? 'text-red-400 bg-red-400/10' : canVote ? 'text-slate-500 hover:bg-slate-700' : 'text-slate-700 cursor-not-allowed'}`}
                             >
                                 <ThumbsDown size={16} />
                             </button>
