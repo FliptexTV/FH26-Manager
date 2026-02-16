@@ -64,6 +64,7 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
   
   // Adjusted vertical positions
   const textContainerPosition = isSmall ? 'bottom-[16%]' : 'bottom-[10%]';
+  // Changed from top-[18%] to top-[22%] to move OVR down
   const ratingPosition = isSmall ? 'top-[22%]' : 'top-[22%]';
 
   // --- TILT LOGIC ---

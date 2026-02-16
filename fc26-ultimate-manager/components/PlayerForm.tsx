@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Player, Position, PlayerStats, CardType, GameStats } from '../types';
 import { POSITION_WEIGHTS, CARD_DESIGNS, NATIONS } from '../constants';
 import { uploadPlayerImage } from '../services/playerService';
-import { Upload, X, Calculator, Check, Link as LinkIcon, Loader2, Trophy, BarChart3, TrendingUp } from 'lucide-react';
+import { Upload, X, Calculator, Check, Link as LinkIcon, Loader2, Trophy, BarChart3, TrendingUp, Lock, Unlock } from 'lucide-react';
 
 interface PlayerFormProps {
   initialPlayer?: Player;
@@ -13,11 +13,17 @@ interface PlayerFormProps {
 
 const PlayerForm: React.FC<PlayerFormProps> = ({ initialPlayer, onSave, onCancel }) => {
   const [isUploading, setIsUploading] = useState(false);
+  
+  // Initialisiere autoCalculate basierend auf dem gespeicherten ratingMode
+  // Wenn ratingMode 'manual' ist, dann ist autoCalculate false. Sonst true (default).
+  const [autoCalculate, setAutoCalculate] = useState(initialPlayer?.ratingMode !== 'manual');
+
   const [formData, setFormData] = useState<Player>(initialPlayer || {
     id: Date.now().toString(),
     name: '',
     position: Position.ST,
     rating: 75,
+    ratingMode: 'auto',
     image: 'https://picsum.photos/200',
     cardType: 'gold',
     nation: '🇩🇪',
@@ -26,7 +32,6 @@ const PlayerForm: React.FC<PlayerFormProps> = ({ initialPlayer, onSave, onCancel
     gameStats: { played: 0, won: 0, goals: 0, assists: 0, cleanSheets: 0 }
   });
 
-  const [autoCalculate, setAutoCalculate] = useState(true);
   const isGK = formData.position === Position.GK;
 
   // New "Real FC" Formula
@@ -50,13 +55,11 @@ const PlayerForm: React.FC<PlayerFormProps> = ({ initialPlayer, onSave, onCancel
     let baseRating = Math.round(totalScore / totalWeight);
 
     // 2. International Reputation Simulation (The "FC Boost")
-    // FC ratings add a boost based on the base rating to simulate star power.
-    // e.g. Base 85 -> +2 Boost -> 87 OVR.
     let intlRepBoost = 0;
     if (baseRating >= 90) intlRepBoost = 5;
     else if (baseRating >= 85) intlRepBoost = 4;
     else if (baseRating >= 80) intlRepBoost = 3;
-    else if (baseRating >= 70) intlRepBoost = 2; // No boost for silver/bronze usually
+    else if (baseRating >= 70) intlRepBoost = 2; 
     
     // 3. Final Clamping
     const finalRating = Math.min(99, baseRating + intlRepBoost);
@@ -64,12 +67,26 @@ const PlayerForm: React.FC<PlayerFormProps> = ({ initialPlayer, onSave, onCancel
     return finalRating;
   };
 
+  // Effect: Recalculate OVR only if autoCalculate is TRUE
   useEffect(() => {
     if (autoCalculate) {
       const newRating = calculateOVR(formData.position, formData.stats);
-      setFormData(prev => ({ ...prev, rating: newRating }));
+      setFormData(prev => ({ 
+          ...prev, 
+          rating: newRating,
+          ratingMode: 'auto' // Ensure mode is auto when checked
+      }));
     }
   }, [formData.stats, formData.position, autoCalculate]);
+
+  const toggleAutoCalculate = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const checked = e.target.checked;
+      setAutoCalculate(checked);
+      setFormData(prev => ({
+          ...prev,
+          ratingMode: checked ? 'auto' : 'manual'
+      }));
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -97,7 +114,6 @@ const PlayerForm: React.FC<PlayerFormProps> = ({ initialPlayer, onSave, onCancel
       }));
   };
 
-  // ASYNC UPLOAD TO FIREBASE
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -205,9 +221,20 @@ const PlayerForm: React.FC<PlayerFormProps> = ({ initialPlayer, onSave, onCancel
             <div className="bg-slate-800/30 p-4 rounded-xl border border-slate-700/50">
                 <div className="flex justify-between items-center mb-4">
                     <h3 className="text-sm font-semibold text-slate-300 uppercase">Attribute</h3>
-                    <div className="flex items-center gap-2 bg-slate-800 px-3 py-1 rounded border border-slate-700">
+                    <div className={`flex items-center gap-2 px-3 py-1 rounded border ${!autoCalculate ? 'bg-blue-900/40 border-blue-500' : 'bg-slate-800 border-slate-700'}`}>
                         <span className="text-xs text-slate-400">Rating</span>
-                        <span className="text-xl font-bold text-yellow-400">{formData.rating}</span>
+                        {autoCalculate ? (
+                            <span className="text-xl font-bold text-yellow-400">{formData.rating}</span>
+                        ) : (
+                            <input 
+                                type="number" 
+                                name="rating"
+                                value={formData.rating} 
+                                onChange={handleChange}
+                                className="w-16 bg-transparent text-xl font-bold text-white focus:outline-none text-center border-b border-blue-400"
+                            />
+                        )}
+                        <span className="text-slate-500 ml-1">{autoCalculate ? <Lock size={12}/> : <Unlock size={12} className="text-blue-400"/>}</span>
                     </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -219,8 +246,8 @@ const PlayerForm: React.FC<PlayerFormProps> = ({ initialPlayer, onSave, onCancel
                 </div>
                 
                 <div className="mt-6 flex items-center justify-between">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" checked={autoCalculate} onChange={(e) => setAutoCalculate(e.target.checked)} className="rounded bg-slate-700 border-slate-600 text-green-500 focus:ring-green-500" />
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input type="checkbox" checked={autoCalculate} onChange={toggleAutoCalculate} className="rounded bg-slate-700 border-slate-600 text-green-500 focus:ring-green-500" />
                         <span className="text-xs text-slate-400">Rating automatisch (FC Style)</span>
                     </label>
                     {autoCalculate && (

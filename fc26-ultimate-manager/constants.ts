@@ -259,7 +259,7 @@ export const POSITION_WEIGHTS: Record<string, Partial<Record<keyof PlayerStats, 
   [Position.CF]:  { SHO: 0.30, DRI: 0.30, PAS: 0.20, PAC: 0.15, PHY: 0.05, DEF: 0.00 },
   
   // Striker: Finishing (Shooting) is king (approx 45% weight in FC).
-  [Position.ST]:  { SHO: 0.55, PHY: 0.20, DRI: 0.15, PAC: 0.15, PAS: 0.05, DEF: 0.00 },
+  [Position.ST]:  { SHO: 0.45, PHY: 0.20, DRI: 0.15, PAC: 0.15, PAS: 0.05, DEF: 0.00 },
 };
 
 export const MOCK_PLAYERS: Player[] = [

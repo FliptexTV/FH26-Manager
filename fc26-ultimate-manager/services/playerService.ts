@@ -1,5 +1,4 @@
 
-
 import { 
   collection, 
   doc, 
@@ -12,7 +11,8 @@ import {
   arrayUnion,
   query,
   orderBy,
-  getDoc
+  getDoc,
+  writeBatch
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, auth, storage } from './firebase';
@@ -137,6 +137,19 @@ export const saveToDatabase = async (player: Player) => {
 
 export const deleteFromDatabase = async (id: string) => {
   await deleteDoc(doc(db, PLAYERS_COLLECTION, id));
+};
+
+// --- ADMIN TOOLS ---
+
+export const resetAllVotes = async () => {
+    const batch = writeBatch(db);
+    const playersSnapshot = await getDocs(collection(db, PLAYERS_COLLECTION));
+    
+    playersSnapshot.forEach((doc) => {
+        batch.update(doc.ref, { votes: {} });
+    });
+    
+    await batch.commit();
 };
 
 // --- IMAGES (STORAGE) ---

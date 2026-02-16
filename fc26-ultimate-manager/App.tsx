@@ -12,6 +12,7 @@ import {
     getAllUsers,
     giveUserCurrency,
     linkUserToPlayer,
+    resetAllVotes, // Imported reset function
     UserData
 } from './services/playerService';
 import { auth, googleProvider } from './services/firebase';
@@ -24,9 +25,10 @@ import TeamBuilder from './components/TeamBuilder';
 import StatsView from './components/StatsView';
 import MatchView from './components/MatchView';
 import PackOpener from './components/PackOpener';
+import PenaltyGame from './components/PenaltyGame';
 import VotingModal from './components/VotingModal';
 import ConfirmationModal from './components/ConfirmationModal';
-import { LayoutGrid, Users, BarChart3, Plus, ShieldCheck, PlayCircle, ArrowUpDown, Package, Gift, CheckCircle2, LogOut, Globe, UserCircle, X, Coins, UserCog, Ghost, LogIn } from 'lucide-react';
+import { LayoutGrid, Users, BarChart3, Plus, ShieldCheck, PlayCircle, ArrowUpDown, Package, Gift, CheckCircle2, LogOut, Globe, UserCircle, X, Coins, UserCog, Ghost, LogIn, Gamepad2, AlertTriangle, RefreshCw } from 'lucide-react';
 
 // Namespace import extraction for safety
 const { signInWithPopup, signOut, onAuthStateChanged } = firebaseAuth;
@@ -153,6 +155,13 @@ const App: React.FC = () => {
       // Refresh list
       const users = await getAllUsers();
       setUserList(users);
+  };
+
+  const handleResetVotes = async () => {
+      if (window.confirm("Bist du sicher? Dies setzt ALLE Community-Votes für ALLE Spieler auf 0 zurück. Das kann nicht rückgängig gemacht werden.")) {
+          await resetAllVotes();
+          setToast({ message: "Saison Reset: Alle Votes gelöscht.", type: 'success' });
+      }
   };
 
   // CRUD & Interaction
@@ -375,6 +384,7 @@ const App: React.FC = () => {
         {view === 'matches' && <MatchView isAdmin={isAdmin} />}
         {view === 'packs' && <PackOpener />}
         {view === 'stats' && <StatsView players={players} />}
+        {view === 'minigames' && <PenaltyGame />}
 
       </main>
 
@@ -383,7 +393,7 @@ const App: React.FC = () => {
         <nav className="flex justify-around items-center max-w-md mx-auto">
           <button onClick={() => setView('players')} className={`flex flex-col items-center gap-1 p-2 rounded-lg transition ${view === 'players' ? 'text-green-400 bg-slate-800' : 'text-slate-500'}`}><LayoutGrid size={20} /></button>
           <button onClick={() => setView('team')} className={`flex flex-col items-center gap-1 p-2 rounded-lg transition ${view === 'team' ? 'text-green-400 bg-slate-800' : 'text-slate-500'}`}><Users size={20} /></button>
-          <button onClick={() => setView('matches')} className={`flex flex-col items-center gap-1 p-2 rounded-lg transition ${view === 'matches' ? 'text-green-400 bg-slate-800' : 'text-slate-500'}`}><PlayCircle size={20} /></button>
+          <button onClick={() => setView('minigames')} className={`flex flex-col items-center gap-1 p-2 rounded-lg transition ${view === 'minigames' ? 'text-green-400 bg-slate-800' : 'text-slate-500'}`}><Gamepad2 size={20} /></button>
           <button onClick={() => setView('packs')} className={`flex flex-col items-center gap-1 p-2 rounded-lg transition ${view === 'packs' ? 'text-green-400 bg-slate-800' : 'text-slate-500'}`}><Package size={20} /></button>
           <button onClick={() => setView('stats')} className={`flex flex-col items-center gap-1 p-2 rounded-lg transition ${view === 'stats' ? 'text-green-400 bg-slate-800' : 'text-slate-500'}`}><BarChart3 size={20} /></button>
         </nav>
@@ -393,7 +403,7 @@ const App: React.FC = () => {
        <div className="hidden lg:flex fixed left-0 top-16 bottom-0 w-20 flex-col items-center py-8 gap-8 border-r border-slate-800 bg-slate-900/50 backdrop-blur-sm z-20">
           <button onClick={() => setView('players')} className={`p-3 rounded-xl transition hover:bg-slate-800 ${view === 'players' ? 'bg-slate-800 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.2)]' : 'text-slate-400'}`}><LayoutGrid size={24} /></button>
           <button onClick={() => setView('team')} className={`p-3 rounded-xl transition hover:bg-slate-800 ${view === 'team' ? 'bg-slate-800 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.2)]' : 'text-slate-400'}`}><Users size={24} /></button>
-          <button onClick={() => setView('matches')} className={`p-3 rounded-xl transition hover:bg-slate-800 ${view === 'matches' ? 'bg-slate-800 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.2)]' : 'text-slate-400'}`}><PlayCircle size={24} /></button>
+          <button onClick={() => setView('minigames')} className={`p-3 rounded-xl transition hover:bg-slate-800 ${view === 'minigames' ? 'bg-slate-800 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.2)]' : 'text-slate-400'}`} title="Minigames"><Gamepad2 size={24} /></button>
           <button onClick={() => setView('packs')} className={`p-3 rounded-xl transition hover:bg-slate-800 ${view === 'packs' ? 'bg-slate-800 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.2)]' : 'text-slate-400'}`}><Package size={24} /></button>
           <button onClick={() => setView('stats')} className={`p-3 rounded-xl transition hover:bg-slate-800 ${view === 'stats' ? 'bg-slate-800 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.2)]' : 'text-slate-400'}`}><BarChart3 size={24} /></button>
       </div>
@@ -426,6 +436,16 @@ const App: React.FC = () => {
                       <h2 className="text-xl font-bold text-white flex items-center gap-2"><Users size={24} className="text-green-400"/> Mitglieder & Accounts</h2>
                       <button onClick={() => setShowUserList(false)} className="text-slate-400 hover:text-white bg-slate-800 rounded-full p-1"><X size={20}/></button>
                   </div>
+
+                  {/* ADMIN TOOLS BAR */}
+                  {isAdmin && (
+                      <div className="p-3 bg-red-900/10 border-b border-red-900/20 flex items-center justify-between">
+                          <span className="text-xs uppercase font-bold text-red-300 flex items-center gap-2"><AlertTriangle size={14}/> Admin Zone</span>
+                          <button onClick={handleResetVotes} className="flex items-center gap-2 bg-red-900/20 hover:bg-red-900/40 text-red-300 border border-red-800/50 px-3 py-1.5 rounded text-xs font-bold transition">
+                             <RefreshCw size={12}/> Saison Reset (Votes löschen)
+                          </button>
+                      </div>
+                  )}
                   
                   <div className="p-0 overflow-y-auto flex-1 bg-slate-950/50">
                       {userList.length === 0 ? (

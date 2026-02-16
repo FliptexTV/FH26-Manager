@@ -1,5 +1,4 @@
 
-
 export enum Position {
   GK = 'TW',
   // Defense
@@ -63,6 +62,7 @@ export interface Player {
   name: string;
   position: Position;
   rating: number; // 1-99
+  ratingMode?: 'auto' | 'manual'; // NEU: Speichert, ob Rating manuell festgelegt wurde
   image: string; // URL or Base64
   nation?: string; // Optional: ISO code or name
   club?: string;
@@ -105,4 +105,4 @@ export interface MatchResult {
   events: MatchEvent[];
 }
 
-export type ViewState = 'players' | 'team' | 'matches' | 'stats' | 'packs';
+export type ViewState = 'players' | 'team' | 'matches' | 'stats' | 'packs' | 'minigames';
