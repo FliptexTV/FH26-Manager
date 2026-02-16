@@ -1,30 +1,76 @@
 
-import React from 'react';
-import { Player } from '../types';
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, PieChart, Pie, Cell } from 'recharts';
-import { Club } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Player, PotmHistory, PotmState } from '../types';
+import { UserData, subscribeToPotmState, subscribeToPotmHistory, startPotmVoting, castPotmVote, endPotmVoting, getUserId } from '../services/playerService';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
+import { Club, Crown, Play, Square, Calendar, Vote, AlertTriangle, Lock } from 'lucide-react';
+import PlayerCard from './PlayerCard';
 
 interface StatsViewProps {
   players: Player[];
+  userData: UserData | null;
 }
 
-const StatsView: React.FC<StatsViewProps> = ({ players }) => {
+const StatsView: React.FC<StatsViewProps> = ({ players, userData }) => {
+  const [activePotm, setActivePotm] = useState<PotmState>({ isActive: false, matchDate: '', votes: {} });
+  const [potmHistory, setPotmHistory] = useState<PotmHistory[]>([]);
+  
+  // Admin Controls
+  const [matchDateInput, setMatchDateInput] = useState(new Date().toISOString().split('T')[0]);
+  const isAdmin = userData?.role === 'admin';
+  const hasPlayerCard = !!userData?.linkedPlayerId;
+  const currentUserId = getUserId();
+
+  useEffect(() => {
+      const unsubState = subscribeToPotmState(setActivePotm);
+      const unsubHistory = subscribeToPotmHistory(setPotmHistory);
+      return () => { unsubState(); unsubHistory(); };
+  }, []);
+
+  // Helpers
+  const handleStartVoting = async () => {
+      if(!matchDateInput) return;
+      await startPotmVoting(matchDateInput);
+  };
+
+  const handleEndVoting = async () => {
+      // Calculate Winner
+      const voteCounts: Record<string, number> = {};
+      Object.values(activePotm.votes).forEach(pid => {
+          voteCounts[pid] = (voteCounts[pid] || 0) + 1;
+      });
+      
+      let winnerId = '';
+      let maxVotes = -1;
+
+      Object.entries(voteCounts).forEach(([pid, count]) => {
+          if (count > maxVotes) {
+              maxVotes = count;
+              winnerId = pid;
+          }
+      });
+      
+      // If no votes, just take first active player or random to avoid crash (or block it)
+      if (!winnerId && players.length > 0) winnerId = players[0].id;
+      
+      await endPotmVoting(winnerId, maxVotes > 0 ? maxVotes : 0, activePotm.matchDate);
+  };
+
+  // --- STATS CALCULATION ---
+
   if (players.length === 0) return <div className="p-10 text-center text-slate-500">Keine Daten verfügbar.</div>;
 
-  // 1. Top Ratings
-  const topRatedData = [...players]
-    .sort((a, b) => b.rating - a.rating)
-    .slice(0, 5)
-    .map(p => ({ name: p.name, rating: p.rating }));
-
-  // 2. Top Scorers (from Real Games)
   const topScorers = [...players]
     .filter(p => p.gameStats && p.gameStats.goals > 0)
     .sort((a, b) => (b.gameStats?.goals || 0) - (a.gameStats?.goals || 0))
     .slice(0, 5)
     .map(p => ({ name: p.name, goals: p.gameStats?.goals || 0 }));
 
-  // 3. Win Rates (min 1 game)
+  const topRatedData = [...players]
+    .sort((a, b) => b.rating - a.rating)
+    .slice(0, 5)
+    .map(p => ({ name: p.name, rating: p.rating }));
+
   const bestWinRate = [...players]
     .filter(p => p.gameStats && p.gameStats.played > 0)
     .sort((a, b) => {
@@ -38,19 +84,161 @@ const StatsView: React.FC<StatsViewProps> = ({ players }) => {
         rate: Math.round(((p.gameStats!.won / p.gameStats!.played) * 100))
     }));
 
-  // MVP Analysis
-  const topPlayer = players.reduce((prev, current) => (prev.rating > current.rating) ? prev : current);
-  const radarData = Object.entries(topPlayer.stats).map(([key, value]) => ({
-    subject: key,
-    A: value,
-    fullMark: 99
-  }));
+  // Resolve current voting stats for chart
+  const currentVoteData = activePotm.isActive 
+      ? Object.values(activePotm.votes).reduce((acc: any[], pid) => {
+          const existing = acc.find(x => x.id === pid);
+          if (existing) existing.votes++;
+          else {
+              const p = players.find(pl => pl.id === pid);
+              if (p) acc.push({ name: p.name, votes: 1, id: pid });
+          }
+          return acc;
+      }, []).sort((a: any, b: any) => b.votes - a.votes) 
+      : [];
 
-  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
+  const lastWinner = potmHistory.length > 0 ? players.find(p => p.id === potmHistory[0].playerId) : null;
+  const lastWinnerData = potmHistory.length > 0 ? potmHistory[0] : null;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-20">
       
+      {/* 1. POTM VOTING CARD (Replaces MVP) */}
+      <div className={`md:col-span-2 rounded-xl p-6 shadow-2xl relative overflow-hidden border transition-colors ${activePotm.isActive ? 'bg-indigo-950 border-indigo-500/50' : 'bg-slate-900 border-slate-800'}`}>
+         
+         {/* Active Badge */}
+         {activePotm.isActive && (
+             <div className="absolute top-0 right-0 bg-red-600 text-white text-xs font-bold px-3 py-1 rounded-bl-lg animate-pulse uppercase">
+                 Live Voting
+             </div>
+         )}
+         
+         <div className="flex flex-col md:flex-row gap-8 items-center">
+             
+             {/* Left: Content / Controls */}
+             <div className="flex-1 w-full">
+                 <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-yellow-100 to-yellow-300 uppercase italic tracking-tighter mb-1 flex items-center gap-2">
+                    <Crown className="text-yellow-400 fill-yellow-600"/> Player of the Match
+                 </h2>
+                 <p className="text-slate-400 text-sm mb-6">Wähle den besten Spieler des heutigen Spieltags.</p>
+
+                 {activePotm.isActive ? (
+                     <div className="space-y-4">
+                         {/* VOTING AREA */}
+                         {hasPlayerCard ? (
+                             <div className="bg-black/30 p-4 rounded-xl border border-indigo-500/30">
+                                 <h3 className="text-indigo-200 font-bold mb-3 flex items-center gap-2"><Vote size={18}/> Deine Stimme abgeben</h3>
+                                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-[200px] overflow-y-auto p-1">
+                                     {players.map(p => {
+                                         const isSelected = activePotm.votes[currentUserId] === p.id;
+                                         return (
+                                             <button 
+                                                key={p.id}
+                                                onClick={() => castPotmVote(p.id)}
+                                                className={`text-left p-2 rounded text-xs font-bold truncate transition border ${isSelected ? 'bg-yellow-500 text-black border-yellow-400 shadow-lg scale-105' : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'}`}
+                                             >
+                                                 {p.name}
+                                             </button>
+                                         );
+                                     })}
+                                 </div>
+                             </div>
+                         ) : (
+                             <div className="bg-red-900/20 text-red-300 p-4 rounded-xl border border-red-900/50 flex items-center gap-3">
+                                 <Lock size={20}/>
+                                 <span className="text-sm">Du benötigst eine eigene Spielerkarte um abzustimmen.</span>
+                             </div>
+                         )}
+
+                         {/* Live Results Bar (Visible to all) */}
+                         <div className="mt-4">
+                             <h4 className="text-xs text-indigo-300 uppercase font-bold mb-2">Live Ergebnisse</h4>
+                             <div className="space-y-1">
+                                 {currentVoteData.map((d: any) => (
+                                     <div key={d.id} className="flex items-center gap-2 text-xs">
+                                         <div className="w-20 truncate text-indigo-100">{d.name}</div>
+                                         <div className="flex-1 h-2 bg-indigo-900/50 rounded-full overflow-hidden">
+                                             <div className="h-full bg-yellow-400" style={{ width: `${(d.votes / Object.keys(activePotm.votes).length) * 100}%` }}></div>
+                                         </div>
+                                         <span className="font-mono text-indigo-300">{d.votes}</span>
+                                     </div>
+                                 ))}
+                                 {currentVoteData.length === 0 && <span className="text-indigo-400/50 text-xs italic">Noch keine Stimmen...</span>}
+                             </div>
+                         </div>
+
+                         {/* Admin End Button */}
+                         {isAdmin && (
+                             <button onClick={handleEndVoting} className="w-full mt-4 bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2 shadow-lg hover:shadow-red-900/20 transition">
+                                 <Square size={16} fill="currentColor"/> Voting Beenden & Gewinner küren
+                             </button>
+                         )}
+                     </div>
+                 ) : (
+                     <div className="space-y-6">
+                         {/* Show Last Winner Info */}
+                         {lastWinnerData ? (
+                             <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700">
+                                 <div className="text-xs text-slate-500 uppercase font-bold mb-1 flex items-center gap-2">
+                                     <Calendar size={12}/> Letzter Gewinner ({lastWinnerData.date})
+                                 </div>
+                                 <div className="text-white text-lg font-bold">
+                                     {players.find(p => p.id === lastWinnerData.playerId)?.name || 'Unbekannt'}
+                                     <span className="text-yellow-500 text-sm ml-2 font-normal">mit {lastWinnerData.votesReceived} Stimmen</span>
+                                 </div>
+                             </div>
+                         ) : (
+                             <div className="text-slate-500 italic">Noch keine POTM Historie.</div>
+                         )}
+
+                         {/* Admin Start Controls */}
+                         {isAdmin && (
+                             <div className="bg-slate-800 p-4 rounded-xl border border-slate-700">
+                                 <label className="text-xs text-slate-400 uppercase font-bold block mb-2">Datum des Spiels</label>
+                                 <div className="flex gap-2">
+                                     <input 
+                                        type="date" 
+                                        value={matchDateInput}
+                                        onChange={(e) => setMatchDateInput(e.target.value)}
+                                        className="bg-slate-900 border border-slate-600 text-white rounded px-3 py-2 text-sm flex-1"
+                                     />
+                                     <button onClick={handleStartVoting} className="bg-green-600 hover:bg-green-500 text-white font-bold px-4 py-2 rounded flex items-center gap-2 text-sm transition">
+                                         <Play size={16}/> Voting Starten
+                                     </button>
+                                 </div>
+                             </div>
+                         )}
+                     </div>
+                 )}
+             </div>
+
+             {/* Right: Winner Display / Placeholder */}
+             <div className="w-full md:w-auto flex justify-center md:justify-end">
+                 {activePotm.isActive ? (
+                     <div className="w-48 h-64 bg-indigo-900/20 rounded-xl border-2 border-dashed border-indigo-500/30 flex items-center justify-center flex-col gap-2 animate-pulse">
+                         <Crown size={48} className="text-indigo-500/50"/>
+                         <span className="text-indigo-300/50 text-xs font-bold uppercase">Wird gesucht...</span>
+                     </div>
+                 ) : lastWinner ? (
+                     <div className="relative group perspective-1000">
+                         <div className="absolute -inset-1 bg-gradient-to-tr from-yellow-600 via-yellow-400 to-yellow-600 rounded-[2.5rem] blur opacity-50"></div>
+                         <div className="relative transform rotate-3 transition group-hover:rotate-0 duration-500">
+                            <PlayerCard player={lastWinner} size="md" disableHover />
+                         </div>
+                         <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 bg-yellow-500 text-black font-black px-4 py-1 rounded-full shadow-xl border-2 border-yellow-200 text-xs whitespace-nowrap z-20">
+                             POTM {lastWinnerData?.date}
+                         </div>
+                     </div>
+                 ) : (
+                     <div className="w-48 h-64 bg-slate-800/50 rounded-xl border-2 border-dashed border-slate-700 flex items-center justify-center">
+                         <span className="text-slate-600 text-xs font-bold">Kein Gewinner</span>
+                     </div>
+                 )}
+             </div>
+
+         </div>
+      </div>
+
       {/* Real Game Stats: Top Scorers */}
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-lg relative overflow-hidden">
         <div className="absolute top-0 right-0 p-4 opacity-10"><Club size={100} /></div>
@@ -89,32 +277,6 @@ const StatsView: React.FC<StatsViewProps> = ({ players }) => {
               />
               <Bar dataKey="rating" fill="#facc15" radius={[0, 4, 4, 0]} barSize={20} />
             </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* MVP Radar */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-lg">
-        <div className="flex justify-between items-center mb-6 border-b border-slate-800 pb-2">
-           <h3 className="text-xl font-bold text-white">MVP Analyse</h3>
-           <span className="text-sm text-yellow-400 font-mono">{topPlayer.name} ({topPlayer.rating})</span>
-        </div>
-        
-        <div className="h-[300px] w-full flex justify-center">
-          <ResponsiveContainer width="100%" height="100%">
-            <RadarChart cx="50%" cy="50%" outerRadius="70%" data={radarData}>
-              <PolarGrid stroke="#334155" />
-              <PolarAngleAxis dataKey="subject" tick={{ fill: '#94a3b8', fontSize: 12 }} />
-              <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
-              <Radar
-                name={topPlayer.name}
-                dataKey="A"
-                stroke="#3b82f6"
-                fill="#3b82f6"
-                fillOpacity={0.4}
-              />
-              <Tooltip contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', color: '#fff' }} />
-            </RadarChart>
           </ResponsiveContainer>
         </div>
       </div>

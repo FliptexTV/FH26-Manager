@@ -105,4 +105,18 @@ export interface MatchResult {
   events: MatchEvent[];
 }
 
+// POTM System
+export interface PotmState {
+  isActive: boolean;
+  matchDate: string; // ISO String YYYY-MM-DD
+  votes: Record<string, string>; // UserId -> PlayerId
+}
+
+export interface PotmHistory {
+  id: string;
+  date: string;
+  playerId: string;
+  votesReceived: number;
+}
+
 export type ViewState = 'players' | 'team' | 'matches' | 'stats' | 'packs';

@@ -382,7 +382,7 @@ const App: React.FC = () => {
         {view === 'team' && <TeamBuilder allPlayers={players} />}
         {view === 'matches' && <MatchView isAdmin={isAdmin} />}
         {view === 'packs' && <PackOpener />}
-        {view === 'stats' && <StatsView players={players} />}
+        {view === 'stats' && <StatsView players={players} userData={userData} />}
 
       </main>
 

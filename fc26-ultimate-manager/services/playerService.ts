@@ -12,11 +12,12 @@ import {
   query,
   orderBy,
   getDoc,
-  writeBatch
+  writeBatch,
+  limit
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, auth, storage } from './firebase';
-import { Player, Team, MatchResult, MatchEvent } from '../types';
+import { Player, Team, MatchResult, MatchEvent, PotmState, PotmHistory } from '../types';
 import { MOCK_PLAYERS } from '../constants';
 
 // COLLECTIONS
@@ -24,6 +25,8 @@ const PLAYERS_COLLECTION = 'players';
 const TEAMS_COLLECTION = 'teams';
 const MATCHES_COLLECTION = 'matches';
 const USERS_COLLECTION = 'users';
+const SYSTEM_COLLECTION = 'system'; // New for POTM state
+const POTM_HISTORY_COLLECTION = 'potm_history';
 
 // --- AUTH & USER HELPERS ---
 
@@ -150,6 +153,68 @@ export const resetAllVotes = async () => {
     });
     
     await batch.commit();
+};
+
+// --- POTM VOTING SYSTEM ---
+
+export const subscribeToPotmState = (callback: (state: PotmState) => void) => {
+    return onSnapshot(doc(db, SYSTEM_COLLECTION, 'potm_active'), (docSnap) => {
+        if (docSnap.exists()) {
+            callback(docSnap.data() as PotmState);
+        } else {
+            callback({ isActive: false, matchDate: '', votes: {} });
+        }
+    });
+};
+
+export const startPotmVoting = async (matchDate: string) => {
+    await setDoc(doc(db, SYSTEM_COLLECTION, 'potm_active'), {
+        isActive: true,
+        matchDate: matchDate,
+        votes: {}
+    });
+};
+
+export const castPotmVote = async (votedPlayerId: string) => {
+    const user = auth.currentUser;
+    if (!user) return;
+    
+    // We update a map field: votes.userId = votedPlayerId
+    const potmRef = doc(db, SYSTEM_COLLECTION, 'potm_active');
+    await updateDoc(potmRef, {
+        [`votes.${user.uid}`]: votedPlayerId
+    });
+};
+
+export const endPotmVoting = async (winnerId: string, votesCount: number, matchDate: string) => {
+    const batch = writeBatch(db);
+    
+    // 1. Save to History
+    const historyRef = doc(collection(db, POTM_HISTORY_COLLECTION));
+    batch.set(historyRef, {
+        id: historyRef.id,
+        date: matchDate,
+        playerId: winnerId,
+        votesReceived: votesCount
+    });
+    
+    // 2. Reset Active State
+    const activeRef = doc(db, SYSTEM_COLLECTION, 'potm_active');
+    batch.update(activeRef, {
+        isActive: false,
+        votes: {}
+    });
+
+    await batch.commit();
+};
+
+export const subscribeToPotmHistory = (callback: (history: PotmHistory[]) => void) => {
+    const q = query(collection(db, POTM_HISTORY_COLLECTION), orderBy('date', 'desc'), limit(10));
+    return onSnapshot(q, (snapshot) => {
+        const history: PotmHistory[] = [];
+        snapshot.forEach(doc => history.push(doc.data() as PotmHistory));
+        callback(history);
+    });
 };
 
 // --- IMAGES (STORAGE) ---
