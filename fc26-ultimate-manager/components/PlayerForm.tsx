@@ -53,10 +53,10 @@ const PlayerForm: React.FC<PlayerFormProps> = ({ initialPlayer, onSave, onCancel
     // FC ratings add a boost based on the base rating to simulate star power.
     // e.g. Base 85 -> +2 Boost -> 87 OVR.
     let intlRepBoost = 0;
-    if (baseRating >= 90) intlRepBoost = 3;
-    else if (baseRating >= 80) intlRepBoost = 2;
-    else if (baseRating >= 70) intlRepBoost = 1;
-    else if (baseRating >= 50) intlRepBoost = 0; // No boost for silver/bronze usually
+    if (baseRating >= 90) intlRepBoost = 5;
+    else if (baseRating >= 85) intlRepBoost = 4;
+    else if (baseRating >= 80) intlRepBoost = 3;
+    else if (baseRating >= 70) intlRepBoost = 2; // No boost for silver/bronze usually
     
     // 3. Final Clamping
     const finalRating = Math.min(99, baseRating + intlRepBoost);
