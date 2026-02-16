@@ -232,31 +232,31 @@ export const POSITION_WEIGHTS: Record<string, Partial<Record<keyof PlayerStats, 
   [Position.GK]:  { REF: 0.28, DIV: 0.26, POS: 0.24, HAN: 0.15, KIC: 0.07, SPE: 0.00 },
   
   // Center Back: DEF > PHY > PAC. Shooting/Dribbling mostly irrelevant.
-  [Position.CB]:  { DEF: 0.55, PHY: 0.35, PAC: 0.10, PAS: 0.05, DRI: 0.05, SHO: 0.00 },
+  [Position.CB]:  { DEF: 0.45, PHY: 0.35, PAC: 0.10, PAS: 0.05, DRI: 0.05, SHO: 0.00 },
   
   // Full Backs: Needs a bit of everything, but PACE and DEF are key.
-  [Position.LB]:  { DEF: 0.45, PAC: 0.25, DRI: 0.15, PAS: 0.15, PHY: 0.10, SHO: 0.00 },
-  [Position.RB]:  { DEF: 0.45, PAC: 0.25, DRI: 0.15, PAS: 0.15, PHY: 0.10, SHO: 0.00 },
-  [Position.LWB]: { PAC: 0.35, DRI: 0.20, DEF: 0.25, PAS: 0.20, PHY: 0.05, SHO: 0.05 },
-  [Position.RWB]: { PAC: 0.35, DRI: 0.20, DEF: 0.25, PAS: 0.20, PHY: 0.05, SHO: 0.05 },
+  [Position.LB]:  { DEF: 0.35, PAC: 0.25, DRI: 0.15, PAS: 0.15, PHY: 0.10, SHO: 0.00 },
+  [Position.RB]:  { DEF: 0.35, PAC: 0.25, DRI: 0.15, PAS: 0.15, PHY: 0.10, SHO: 0.00 },
+  [Position.LWB]: { PAC: 0.25, DRI: 0.20, DEF: 0.25, PAS: 0.20, PHY: 0.05, SHO: 0.05 },
+  [Position.RWB]: { PAC: 0.25, DRI: 0.20, DEF: 0.25, PAS: 0.20, PHY: 0.05, SHO: 0.05 },
   
   // CDM: Defense and Passing/Physicality.
-  [Position.CDM]: { DEF: 0.50, PAS: 0.25, PHY: 0.25, DRI: 0.05, PAC: 0.05, SHO: 0.00 },
+  [Position.CDM]: { DEF: 0.40, PAS: 0.25, PHY: 0.25, DRI: 0.05, PAC: 0.05, SHO: 0.00 },
   
   // CM: The engine. Passing and Dribbling are highest coefficients.
-  [Position.CM]:  { PAS: 0.45, DRI: 0.30, SHO: 0.10, DEF: 0.10, PHY: 0.10, PAC: 0.05 },
+  [Position.CM]:  { PAS: 0.35, DRI: 0.30, SHO: 0.10, DEF: 0.10, PHY: 0.10, PAC: 0.05 },
   
   // CAM: Dribbling and Passing dominate.
-  [Position.CAM]: { PAS: 0.40, DRI: 0.30, SHO: 0.20, PAC: 0.10, PHY: 0.10, DEF: 0.00 },
+  [Position.CAM]: { PAS: 0.30, DRI: 0.30, SHO: 0.20, PAC: 0.10, PHY: 0.10, DEF: 0.00 },
   
   // Wingers: Dribbling, Pace, Crossing (Pas).
-  [Position.LM]:  { DRI: 0.45, PAC: 0.25, PAS: 0.25, SHO: 0.10, PHY: 0.05, DEF: 0.00 },
-  [Position.RM]:  { DRI: 0.45, PAC: 0.25, PAS: 0.25, SHO: 0.10, PHY: 0.05, DEF: 0.00 },
-  [Position.LW]:  { DRI: 0.45, PAC: 0.25, SHO: 0.25, PAS: 0.10, PHY: 0.05, DEF: 0.00 },
-  [Position.RW]:  { DRI: 0.45, PAC: 0.25, SHO: 0.25, PAS: 0.10, PHY: 0.05, DEF: 0.00 },
+  [Position.LM]:  { DRI: 0.35, PAC: 0.25, PAS: 0.25, SHO: 0.10, PHY: 0.05, DEF: 0.00 },
+  [Position.RM]:  { DRI: 0.35, PAC: 0.25, PAS: 0.25, SHO: 0.10, PHY: 0.05, DEF: 0.00 },
+  [Position.LW]:  { DRI: 0.35, PAC: 0.25, SHO: 0.25, PAS: 0.10, PHY: 0.05, DEF: 0.00 },
+  [Position.RW]:  { DRI: 0.35, PAC: 0.25, SHO: 0.25, PAS: 0.10, PHY: 0.05, DEF: 0.00 },
   
   // CF: Like CAM but more shooting focus.
-  [Position.CF]:  { SHO: 0.40, DRI: 0.30, PAS: 0.20, PAC: 0.15, PHY: 0.05, DEF: 0.00 },
+  [Position.CF]:  { SHO: 0.30, DRI: 0.30, PAS: 0.20, PAC: 0.15, PHY: 0.05, DEF: 0.00 },
   
   // Striker: Finishing (Shooting) is king (approx 45% weight in FC).
   [Position.ST]:  { SHO: 0.55, PHY: 0.20, DRI: 0.15, PAC: 0.15, PAS: 0.05, DEF: 0.00 },
