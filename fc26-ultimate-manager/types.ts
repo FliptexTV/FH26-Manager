@@ -103,6 +103,9 @@ export interface MatchResult {
   date: number;
   duration: number; // in seconds
   events: MatchEvent[];
+  // NEW: Save the specific players who played, in case teams were edited for this match only
+  homePlayerIds?: string[];
+  awayPlayerIds?: string[];
 }
 
 // POTM System

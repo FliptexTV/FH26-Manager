@@ -46,7 +46,8 @@ const StatsView: React.FC<StatsViewProps> = ({ players, userData }) => {
   const handleEndVoting = async () => {
       // Calculate Winner
       const voteCounts: Record<string, number> = {};
-      Object.values(activePotm.votes).forEach(pid => {
+      const votesArray = Object.values(activePotm.votes || {}) as string[];
+      votesArray.forEach(pid => {
           voteCounts[pid] = (voteCounts[pid] || 0) + 1;
       });
       
@@ -67,7 +68,7 @@ const StatsView: React.FC<StatsViewProps> = ({ players, userData }) => {
   };
 
   const getVoterNamesForPlayer = (playerId: string) => {
-      const voterIds = Object.entries(activePotm.votes)
+      const voterIds = Object.entries(activePotm.votes || {})
           .filter(([uid, pid]) => pid === playerId)
           .map(([uid]) => uid);
       
@@ -107,7 +108,7 @@ const StatsView: React.FC<StatsViewProps> = ({ players, userData }) => {
 
   // Resolve current voting stats for chart
   const currentVoteData = activePotm.isActive 
-      ? Object.values(activePotm.votes).reduce((acc: any[], pid) => {
+      ? (Object.values(activePotm.votes || {}) as string[]).reduce((acc: any[], pid) => {
           const existing = acc.find(x => x.id === pid);
           if (existing) existing.votes++;
           else {

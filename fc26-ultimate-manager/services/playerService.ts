@@ -368,31 +368,38 @@ export const saveMatch = async (match: MatchResult) => {
     await setDoc(doc(db, MATCHES_COLLECTION, match.id), match);
     await addCurrency(1); // Reward for saving
 
-    // 2. Fetch involved teams to identify players
     try {
-        const homeTeamDoc = await getDoc(doc(db, TEAMS_COLLECTION, match.homeTeamId));
-        const awayTeamDoc = await getDoc(doc(db, TEAMS_COLLECTION, match.awayTeamId));
+        const homeWon = match.homeScore > match.awayScore;
+        const awayWon = match.awayScore > match.homeScore;
 
-        if (homeTeamDoc.exists() && awayTeamDoc.exists()) {
-            const homeTeam = homeTeamDoc.data() as Team;
-            const awayTeam = awayTeamDoc.data() as Team;
+        // Calculate goals per player from events
+        const playerGoals: Record<string, number> = {};
+        match.events.forEach(ev => {
+            if (ev.type === 'goal') {
+                playerGoals[ev.playerId] = (playerGoals[ev.playerId] || 0) + 1;
+            }
+        });
 
-            const homeWon = match.homeScore > match.awayScore;
-            const awayWon = match.awayScore > match.homeScore;
+        // Update Home Players
+        // UPDATED: Use specific IDs from match record if available, fallback to team fetch (legacy)
+        let homeIds = match.homePlayerIds;
+        let awayIds = match.awayPlayerIds;
 
-            // Calculate goals per player from events
-            const playerGoals: Record<string, number> = {};
-            match.events.forEach(ev => {
-                if (ev.type === 'goal') {
-                    playerGoals[ev.playerId] = (playerGoals[ev.playerId] || 0) + 1;
-                }
-            });
+        if (!homeIds) {
+             const homeTeamDoc = await getDoc(doc(db, TEAMS_COLLECTION, match.homeTeamId));
+             if (homeTeamDoc.exists()) homeIds = (homeTeamDoc.data() as Team).playerIds.filter((id): id is string => !!id);
+        }
+        
+        if (!awayIds) {
+             const awayTeamDoc = await getDoc(doc(db, TEAMS_COLLECTION, match.awayTeamId));
+             if (awayTeamDoc.exists()) awayIds = (awayTeamDoc.data() as Team).playerIds.filter((id): id is string => !!id);
+        }
 
-            // Update Home Players
-            for (const playerId of homeTeam.playerIds) {
+        // Apply Stats
+        if (homeIds) {
+            for (const playerId of homeIds) {
                 if (!playerId) continue;
                 const goals = playerGoals[playerId] || 0;
-                // Use setDoc with merge to ensure gameStats is created if missing
                 await setDoc(doc(db, PLAYERS_COLLECTION, playerId), {
                     gameStats: {
                         played: increment(1),
@@ -401,9 +408,10 @@ export const saveMatch = async (match: MatchResult) => {
                     }
                 }, { merge: true });
             }
+        }
 
-            // Update Away Players
-            for (const playerId of awayTeam.playerIds) {
+        if (awayIds) {
+            for (const playerId of awayIds) {
                 if (!playerId) continue;
                 const goals = playerGoals[playerId] || 0;
                 await setDoc(doc(db, PLAYERS_COLLECTION, playerId), {
@@ -415,6 +423,7 @@ export const saveMatch = async (match: MatchResult) => {
                 }, { merge: true });
             }
         }
+
     } catch (e) {
         console.error("Error updating player stats after match:", e);
     }
