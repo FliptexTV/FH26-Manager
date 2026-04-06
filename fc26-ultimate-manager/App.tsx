@@ -52,7 +52,7 @@ const App: React.FC = () => {
   const [isAdmin, setIsAdmin] = useState(false); 
   const [showUserList, setShowUserList] = useState(false);
   const [userList, setUserList] = useState<UserData[]>([]);
-  const hasLoggedVisit = React.useRef(false);
+  const loggedVisitUserId = React.useRef<string | null>(null);
   
   // Onboarding State
   const [needsUsername, setNeedsUsername] = useState(false);
@@ -95,9 +95,9 @@ const App: React.FC = () => {
             setNeedsUsername(false);
             
             // Log visit once per session when username is known
-            if (!hasLoggedVisit.current && user) {
+            if (user && loggedVisitUserId.current !== user.uid) {
                 logAction('VISIT', user.uid, data.username || user.displayName || 'User', 'Hat die App geöffnet');
-                hasLoggedVisit.current = true;
+                loggedVisitUserId.current = user.uid;
             }
         }
     });
@@ -130,6 +130,7 @@ const App: React.FC = () => {
   };
 
   const handleLogout = async () => {
+      loggedVisitUserId.current = null;
       await signOut(auth);
       setView('players');
   };
