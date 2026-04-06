@@ -93,12 +93,6 @@ const App: React.FC = () => {
             setNeedsUsername(true);
         } else {
             setNeedsUsername(false);
-            
-            // Log visit once per session when username is known
-            if (user && loggedVisitUserId.current !== user.uid) {
-                logAction('VISIT', user.uid, data.username || user.displayName || 'User', 'Hat die App geöffnet');
-                loggedVisitUserId.current = user.uid;
-            }
         }
     });
 
@@ -118,6 +112,14 @@ const App: React.FC = () => {
         unsubPlayers();
     };
   }, [user]);
+
+  // 3. Log Visit Effect
+  useEffect(() => {
+    if (user && userData?.username && loggedVisitUserId.current !== user.uid) {
+      logAction('VISIT', user.uid, userData.username, 'Hat sich eingeloggt / App geöffnet');
+      loggedVisitUserId.current = user.uid;
+    }
+  }, [user, userData?.username]);
 
   // Auth Functions
   const handleLogin = async () => {
