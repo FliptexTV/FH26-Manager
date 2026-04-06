@@ -122,4 +122,22 @@ export interface PotmHistory {
   votesReceived: number;
 }
 
-export type ViewState = 'players' | 'team' | 'matches' | 'stats' | 'packs';
+export interface ChatMessage {
+  id: string;
+  text: string;
+  userId: string;
+  username: string;
+  photoURL?: string;
+  timestamp: number;
+}
+
+export interface AdminLog {
+  id: string;
+  action: string;
+  userId: string;
+  username: string;
+  details: string;
+  timestamp: number;
+}
+
+export type ViewState = 'players' | 'team' | 'matches' | 'stats' | 'packs' | 'chat' | 'admin-log';

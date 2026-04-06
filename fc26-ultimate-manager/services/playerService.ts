@@ -13,11 +13,13 @@ import {
   orderBy,
   getDoc,
   writeBatch,
-  limit
+  limit,
+  serverTimestamp,
+  addDoc
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, auth, storage } from './firebase';
-import { Player, Team, MatchResult, MatchEvent, PotmState, PotmHistory } from '../types';
+import { Player, Team, MatchResult, MatchEvent, PotmState, PotmHistory, ChatMessage, AdminLog } from '../types';
 import { MOCK_PLAYERS } from '../constants';
 
 // COLLECTIONS
@@ -27,6 +29,8 @@ const MATCHES_COLLECTION = 'matches';
 const USERS_COLLECTION = 'users';
 const SYSTEM_COLLECTION = 'system'; // New for POTM state
 const POTM_HISTORY_COLLECTION = 'potm_history';
+const MESSAGES_COLLECTION = 'messages';
+const LOGS_COLLECTION = 'logs';
 
 // --- AUTH & USER HELPERS ---
 
@@ -143,6 +147,31 @@ export const deleteFromDatabase = async (id: string) => {
 };
 
 // --- ADMIN TOOLS ---
+
+export const logAction = async (action: string, userId: string, username: string, details: string) => {
+    try {
+        await addDoc(collection(db, LOGS_COLLECTION), {
+            action,
+            userId,
+            username,
+            details,
+            timestamp: Date.now()
+        });
+    } catch (e) {
+        console.error("Failed to log action:", e);
+    }
+};
+
+export const subscribeToLogs = (callback: (logs: AdminLog[]) => void) => {
+    const q = query(collection(db, LOGS_COLLECTION), orderBy('timestamp', 'desc'), limit(100));
+    return onSnapshot(q, (snapshot) => {
+        const logs: AdminLog[] = [];
+        snapshot.forEach(doc => {
+            logs.push({ id: doc.id, ...doc.data() } as AdminLog);
+        });
+        callback(logs);
+    });
+};
 
 export const resetAllVotes = async () => {
     const batch = writeBatch(db);
@@ -477,6 +506,9 @@ export const voteForStat = async (playerId: string, statKey: string, direction: 
         votes: player.votes
     });
 
+    // Log the vote
+    await logAction('VOTE', userId, user.displayName || 'User', `Voted ${direction} on ${statKey} for player ${player.name || playerId}`);
+
     return player;
 };
 
@@ -488,6 +520,7 @@ export const openPack = async (): Promise<Player | null> => {
     // Check Balance (Fetch fresh)
     const userDoc = await getDoc(doc(db, USERS_COLLECTION, user.uid));
     const currency = userDoc.data()?.currency || 0;
+    const username = userDoc.data()?.username || user.displayName || 'Ein Manager';
     
     if (currency < 1) return null;
 
@@ -529,5 +562,43 @@ export const openPack = async (): Promise<Player | null> => {
     };
 
     await addToInventory(newPlayer);
+    
+    // Log the pack open
+    await logAction('PACK_OPEN', user.uid, username, `Opened pack and got ${newPlayer.name} (${newPlayer.rating})`);
+
+    // Broadcast to chat
+    try {
+        await sendMessage(`🎉 Ich habe gerade ${newPlayer.name} (Rating: ${newPlayer.rating}) aus einem Pack gezogen!`, user.uid, username, user.photoURL || undefined);
+    } catch (e) {
+        console.error("Failed to send pack message to chat", e);
+    }
+
     return newPlayer;
+};
+
+// --- CHAT ---
+
+export const subscribeToMessages = (callback: (messages: ChatMessage[]) => void) => {
+    const q = query(collection(db, MESSAGES_COLLECTION), orderBy('timestamp', 'asc'), limit(100));
+    return onSnapshot(q, (snapshot) => {
+        const messages: ChatMessage[] = [];
+        snapshot.forEach(doc => {
+            messages.push({ id: doc.id, ...doc.data() } as ChatMessage);
+        });
+        callback(messages);
+    });
+};
+
+export const sendMessage = async (text: string, userId: string, username: string, photoURL?: string) => {
+    await addDoc(collection(db, MESSAGES_COLLECTION), {
+        text,
+        userId,
+        username,
+        photoURL: photoURL || null,
+        timestamp: Date.now()
+    });
+};
+
+export const deleteMessage = async (messageId: string) => {
+    await deleteDoc(doc(db, MESSAGES_COLLECTION, messageId));
 };

@@ -27,7 +27,9 @@ import MatchView from './components/MatchView';
 import PackOpener from './components/PackOpener';
 import VotingModal from './components/VotingModal';
 import ConfirmationModal from './components/ConfirmationModal';
-import { LayoutGrid, Users, BarChart3, Plus, ShieldCheck, PlayCircle, ArrowUpDown, Package, Gift, CheckCircle2, LogOut, Globe, UserCircle, X, Coins, UserCog, Ghost, LogIn, AlertTriangle, RefreshCw, Timer } from 'lucide-react';
+import ChatView from './components/ChatView';
+import AdminLogView from './components/AdminLogView';
+import { LayoutGrid, Users, BarChart3, Plus, ShieldCheck, PlayCircle, ArrowUpDown, Package, Gift, CheckCircle2, LogOut, Globe, UserCircle, X, Coins, UserCog, Ghost, LogIn, AlertTriangle, RefreshCw, Timer, MessageSquare, ClipboardList } from 'lucide-react';
 
 // Namespace import extraction for safety
 const { signInWithPopup, signOut, onAuthStateChanged } = firebaseAuth;
@@ -50,6 +52,7 @@ const App: React.FC = () => {
   const [isAdmin, setIsAdmin] = useState(false); 
   const [showUserList, setShowUserList] = useState(false);
   const [userList, setUserList] = useState<UserData[]>([]);
+  const hasLoggedVisit = React.useRef(false);
   
   // Onboarding State
   const [needsUsername, setNeedsUsername] = useState(false);
@@ -90,6 +93,12 @@ const App: React.FC = () => {
             setNeedsUsername(true);
         } else {
             setNeedsUsername(false);
+            
+            // Log visit once per session when username is known
+            if (!hasLoggedVisit.current && user) {
+                logAction('VISIT', user.uid, data.username || user.displayName || 'User', 'Hat die App geöffnet');
+                hasLoggedVisit.current = true;
+            }
         }
     });
 
@@ -383,6 +392,8 @@ const App: React.FC = () => {
         {view === 'matches' && <MatchView isAdmin={isAdmin} />}
         {view === 'packs' && <PackOpener />}
         {view === 'stats' && <StatsView players={players} userData={userData} />}
+        {view === 'chat' && user && <ChatView user={user} userData={userData} isAdmin={isAdmin} />}
+        {view === 'admin-log' && isAdmin && <AdminLogView />}
 
       </main>
 
@@ -393,17 +404,19 @@ const App: React.FC = () => {
           {(isAdmin || !!userData?.linkedPlayerId) && <button onClick={() => setView('team')} className={`flex flex-col items-center gap-1 p-2 rounded-lg transition ${view === 'team' ? 'text-green-400 bg-slate-800' : 'text-slate-500'}`}><Users size={20} /></button>}
           {(isAdmin || !!userData?.linkedPlayerId) && <button onClick={() => setView('matches')} className={`flex flex-col items-center gap-1 p-2 rounded-lg transition ${view === 'matches' ? 'text-green-400 bg-slate-800' : 'text-slate-500'}`}><Timer size={20} /></button>}
           {(isAdmin || !!userData?.linkedPlayerId) && <button onClick={() => setView('packs')} className={`flex flex-col items-center gap-1 p-2 rounded-lg transition ${view === 'packs' ? 'text-green-400 bg-slate-800' : 'text-slate-500'}`}><Package size={20} /></button>}
-          <button onClick={() => setView('stats')} className={`flex flex-col items-center gap-1 p-2 rounded-lg transition ${view === 'stats' ? 'text-green-400 bg-slate-800' : 'text-slate-500'}`}><BarChart3 size={20} /></button>
+          <button onClick={() => setView('chat')} className={`flex flex-col items-center gap-1 p-2 rounded-lg transition ${view === 'chat' ? 'text-green-400 bg-slate-800' : 'text-slate-500'}`}><MessageSquare size={20} /></button>
         </nav>
       </div>
 
        {/* Desktop Sidebar */}
        <div className="hidden lg:flex fixed left-0 top-16 bottom-0 w-20 flex-col items-center py-8 gap-8 border-r border-slate-800 bg-slate-900/50 backdrop-blur-sm z-20">
-          <button onClick={() => setView('players')} className={`p-3 rounded-xl transition hover:bg-slate-800 ${view === 'players' ? 'bg-slate-800 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.2)]' : 'text-slate-400'}`}><LayoutGrid size={24} /></button>
-          {(isAdmin || !!userData?.linkedPlayerId) && <button onClick={() => setView('team')} className={`p-3 rounded-xl transition hover:bg-slate-800 ${view === 'team' ? 'bg-slate-800 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.2)]' : 'text-slate-400'}`}><Users size={24} /></button>}
-          {(isAdmin || !!userData?.linkedPlayerId) && <button onClick={() => setView('matches')} className={`p-3 rounded-xl transition hover:bg-slate-800 ${view === 'matches' ? 'bg-slate-800 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.2)]' : 'text-slate-400'}`}><Timer size={24} /></button>}
-          {(isAdmin || !!userData?.linkedPlayerId) && <button onClick={() => setView('packs')} className={`p-3 rounded-xl transition hover:bg-slate-800 ${view === 'packs' ? 'bg-slate-800 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.2)]' : 'text-slate-400'}`}><Package size={24} /></button>}
-          <button onClick={() => setView('stats')} className={`p-3 rounded-xl transition hover:bg-slate-800 ${view === 'stats' ? 'bg-slate-800 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.2)]' : 'text-slate-400'}`}><BarChart3 size={24} /></button>
+          <button onClick={() => setView('players')} className={`p-3 rounded-xl transition hover:bg-slate-800 ${view === 'players' ? 'bg-slate-800 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.2)]' : 'text-slate-400'}`} title="Datenbank"><LayoutGrid size={24} /></button>
+          {(isAdmin || !!userData?.linkedPlayerId) && <button onClick={() => setView('team')} className={`p-3 rounded-xl transition hover:bg-slate-800 ${view === 'team' ? 'bg-slate-800 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.2)]' : 'text-slate-400'}`} title="Mein Team"><Users size={24} /></button>}
+          {(isAdmin || !!userData?.linkedPlayerId) && <button onClick={() => setView('matches')} className={`p-3 rounded-xl transition hover:bg-slate-800 ${view === 'matches' ? 'bg-slate-800 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.2)]' : 'text-slate-400'}`} title="Matches"><Timer size={24} /></button>}
+          {(isAdmin || !!userData?.linkedPlayerId) && <button onClick={() => setView('packs')} className={`p-3 rounded-xl transition hover:bg-slate-800 ${view === 'packs' ? 'bg-slate-800 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.2)]' : 'text-slate-400'}`} title="Packs"><Package size={24} /></button>}
+          <button onClick={() => setView('stats')} className={`p-3 rounded-xl transition hover:bg-slate-800 ${view === 'stats' ? 'bg-slate-800 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.2)]' : 'text-slate-400'}`} title="Statistiken"><BarChart3 size={24} /></button>
+          <button onClick={() => setView('chat')} className={`p-3 rounded-xl transition hover:bg-slate-800 ${view === 'chat' ? 'bg-slate-800 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.2)]' : 'text-slate-400'}`} title="Community Chat"><MessageSquare size={24} /></button>
+          {isAdmin && <button onClick={() => setView('admin-log')} className={`p-3 rounded-xl transition hover:bg-slate-800 mt-auto ${view === 'admin-log' ? 'bg-slate-800 text-red-400 shadow-[0_0_15px_rgba(248,113,113,0.2)]' : 'text-red-400/50 hover:text-red-400'}`} title="Admin Log"><ClipboardList size={24} /></button>}
       </div>
       
       {/* Onboarding Modal */}
