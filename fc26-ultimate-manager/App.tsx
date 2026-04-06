@@ -13,6 +13,7 @@ import {
     giveUserCurrency,
     linkUserToPlayer,
     resetAllVotes, // Imported reset function
+    logAction,
     UserData
 } from './services/playerService';
 import { auth, googleProvider } from './services/firebase';
